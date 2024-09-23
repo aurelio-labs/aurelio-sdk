@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "aurelio-sdk"
+version = "0.0.1"
+description = "Aurelio Platform SDK"
+authors = ["Team <hello@aurelio.ai>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aiohttp = "^3.10.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
