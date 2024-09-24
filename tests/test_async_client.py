@@ -9,7 +9,7 @@ from aurelio_sdk.schema import (
     BodyProcessDocumentFileV1ExtractFilePost,
     BodyProcessUrlV1ExtractUrlPost,
     ChunkRequestPayload,
-    ChunkResponsePayload,
+    ChunkResponse,
     ExtractResponsePayload,
 )
 
@@ -53,7 +53,7 @@ async def test_chunk_document_success(async_client):
         )
 
         response = await async_client.chunk_document(payload)
-        assert isinstance(response, ChunkResponsePayload)
+        assert isinstance(response, ChunkResponse)
         assert response.status == "completed"
 
 

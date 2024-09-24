@@ -3,14 +3,36 @@ name = "aurelio-sdk"
 version = "0.0.1"
 description = "Aurelio Platform SDK"
 authors = ["Team <hello@aurelio.ai>"]
-license = "MIT"
 readme = "README.md"
+packages = [{ include = "aurelio_sdk" }]
+
+[project]
+name = "aurelio-sdk"
+version = "0.0.1"
+license = { file = "LICENSE" }
 
 [tool.poetry.dependencies]
 python = "^3.9"
-aiohttp = "^3.10.5"
+aiohttp = "3.10.5"
+requests = "^2.32.3"
+pydantic = "^2.9.2"
 
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.7"
+black = { extras = ["ipykernel"], version = "^24.8.0" }
+types-requests = "^2.32.0.20240914"
+datasets = "^3.0.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff.per-file-ignores]
+"*.ipynb" = ["ALL"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.mypy]
+ignore_missing_imports = true

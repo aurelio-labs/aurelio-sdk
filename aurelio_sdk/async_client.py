@@ -1,36 +1,58 @@
+import os
+from typing import Optional
+
 import aiohttp
 
 from .exceptions import AurelioAPIError
 from .schema import (
     BodyProcessDocumentFileV1ExtractFilePost,
     BodyProcessUrlV1ExtractUrlPost,
+    ChunkingOptions,
     ChunkRequestPayload,
-    ChunkResponsePayload,
+    ChunkResponse,
     ExtractResponsePayload,
 )
 
 
 class AsyncAurelioClient:
-    def __init__(self, base_url: str = "https://api.aurelio.ai"):
+    def __init__(
+        self, api_key: Optional[str] = None, base_url: str = "https://api.aurelio.ai"
+    ):
         self.base_url = base_url
         self.session = aiohttp.ClientSession()
 
-    async def chunk_document(
-        self, payload: ChunkRequestPayload
-    ) -> ChunkResponsePayload:
+        self.api_key = api_key or os.environ.get("AURELIO_API_KEY")
+
+        if not self.api_key:
+            raise ValueError(
+                "API key must be provided either as an argument or "
+                "set as AURELIO_API_KEY environment variable."
+            )
+        self.session.headers.update({"Authorization": f"Bearer {self.api_key}"})
+
+    async def chunk(
+        self, content: str, processing_options: Optional[ChunkingOptions] = None
+    ) -> ChunkResponse:
         """
         Asynchronously chunk a document.
 
-        :param payload: ChunkRequestPayload object containing the content and processing options.
-        :return: ChunkResponsePayload object containing the response from the API.
+        :param content: The content of the document to chunk.
+        :param processing_options: Optional ChunkingOptions object containing processing options.
+        :return: ChunkResponse object containing the response from the API.
         """
         url = f"{self.base_url}/v1/chunk"
-        async with self.session.post(url, json=payload.dict()) as response:
+        payload = ChunkRequestPayload(
+            content=content, processing_options=processing_options
+        )
+        async with self.session.post(url, json=payload.model_dump()) as response:
             if response.status == 200:
                 data = await response.json()
-                return ChunkResponsePayload(**data)
+                return ChunkResponse(**data)
             else:
-                raise AurelioAPIError(response)
+                error_content = await response.text()
+                raise AurelioAPIError(
+                    f"API request failed with status {response.status}: {error_content}"
+                )
 
     async def extract_file(
         self, payload: BodyProcessDocumentFileV1ExtractFilePost

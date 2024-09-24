@@ -1,26 +1,21 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
-class ChunkerType(str, Enum):
-    semantic = "semantic"
-    regex = "regex"
-
-
 class ChunkingOptions(BaseModel):
-    max_chunk_length: int = Field(
+    max_chunk_length: Optional[int] = Field(
         default=400, description="The maximum chunk length for the chunker"
     )
-    chunker_type: ChunkerType = Field(
-        default=ChunkerType.regex,
-        description="The chunker type, either semantic or regex",
+    chunker_type: Optional[Literal["regex", "semantic"]] = Field(
+        default="regex",
+        description="The chunker type, either regex or semantic",
     )
-    window_size: int = Field(
+    window_size: Optional[int] = Field(
         default=1, description="The window size for the semantic chunker"
     )
-    delimiters: List[str] = Field(
+    delimiters: Optional[List[str]] = Field(
         default_factory=list,
         description="Optional. The regex delimiters for the regex chunker",
     )
@@ -28,8 +23,8 @@ class ChunkingOptions(BaseModel):
 
 class ChunkRequestPayload(BaseModel):
     content: str = Field(..., description="Input text to chunk.")
-    processing_options: ChunkingOptions = Field(
-        default_factory=ChunkingOptions,
+    processing_options: Optional[ChunkingOptions] = Field(
+        default=None,
         description="The processing options for the chunker",
     )
 
@@ -78,7 +73,7 @@ class ResponseDocument(BaseModel):
     )
 
 
-class ChunkResponsePayload(BaseModel):
+class ChunkResponse(BaseModel):
     status: TaskStatus = Field(..., description="The status of the chunking process")
     usage: Usage = Field(..., description="Usage")
     message: Optional[str] = Field(None, description="Message")

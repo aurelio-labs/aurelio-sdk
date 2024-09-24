@@ -1,10 +1,16 @@
+import aiohttp
+
+
 class AurelioAPIError(Exception):
     """
     Custom exception for API errors.
     """
 
     def __init__(self, response):
-        self.status_code = response.status_code
+        if isinstance(response, aiohttp.ClientResponse):
+            self.status_code = response.status
+        else:
+            self.status_code = response.status_code
         try:
             self.error = response.json()
         except ValueError:

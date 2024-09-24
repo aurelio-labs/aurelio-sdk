@@ -3,12 +3,13 @@ from typing import Optional
 
 import requests
 
-from .exceptions import AurelioAPIError
-from .schema import (
+from aurelio_sdk.exceptions import AurelioAPIError
+from aurelio_sdk.schema import (
     BodyProcessDocumentFileV1ExtractFilePost,
     BodyProcessUrlV1ExtractUrlPost,
+    ChunkingOptions,
     ChunkRequestPayload,
-    ChunkResponsePayload,
+    ChunkResponse,
     ExtractResponsePayload,
 )
 
@@ -29,7 +30,9 @@ class AurelioClient:
             )
         self.session.headers.update({"Authorization": f"Bearer {self.api_key}"})
 
-    def chunk_document(self, payload: ChunkRequestPayload) -> ChunkResponsePayload:
+    def chunk(
+        self, content: str, processing_options: Optional[ChunkingOptions] = None
+    ) -> ChunkResponse:
         """
         Chunk a document synchronously.
 
@@ -37,9 +40,14 @@ class AurelioClient:
         :return: ChunkResponsePayload object containing the response from the API.
         """
         url = f"{self.base_url}/v1/chunk"
+
+        payload = ChunkRequestPayload(
+            content=content, processing_options=processing_options
+        )
+
         response = self.session.post(url, json=payload.model_dump())
         if response.status_code == 200:
-            return ChunkResponsePayload(**response.json())
+            return ChunkResponse(**response.json())
         else:
             raise AurelioAPIError(response)
 

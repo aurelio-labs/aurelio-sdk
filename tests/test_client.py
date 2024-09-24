@@ -8,7 +8,7 @@ from aurelio_sdk.schema import (
     BodyProcessDocumentFileV1ExtractFilePost,
     BodyProcessUrlV1ExtractUrlPost,
     ChunkRequestPayload,
-    ChunkResponsePayload,
+    ChunkResponse,
     ExtractResponsePayload,
 )
 
@@ -46,7 +46,7 @@ def test_chunk_document_success(sync_client):
         mock_post.return_value.json.return_value = mock_response
 
         response = sync_client.chunk_document(payload)
-        assert isinstance(response, ChunkResponsePayload)
+        assert isinstance(response, ChunkResponse)
         assert response.status == "completed"
 
 
