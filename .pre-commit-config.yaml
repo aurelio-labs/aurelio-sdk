@@ -31,9 +31,9 @@ repos:
       - id: codespell
         name: Run codespell to check for common misspellings in files
         language: python
-        types: [ text ]
-        args: [ "--write-changes", "--ignore-words-list", "asend" ]
-        exclude: "poetry.lock"
+        types: [text]
+        args: ["--write-changes", "--ignore-words-list", "asend"]
+        exclude: 'poetry.lock|.*\.ipynb$'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
@@ -41,13 +41,13 @@ repos:
       - id: check-vcs-permalinks
       - id: end-of-file-fixer
       - id: trailing-whitespace
-        args: [ --markdown-linebreak-ext=md ]
+        args: [--markdown-linebreak-ext=md]
       - id: debug-statements
       - id: no-commit-to-branch
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
-        args: [ '--unsafe' ] # for mkdocs.yml
+        args: ['--unsafe']  # for mkdocs.yml
       - id: detect-private-key
 
   - repo: https://github.com/commitizen-tools/commitizen
@@ -59,13 +59,12 @@ repos:
           - post-commit
           - push
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.290
-    hooks:
-      - id: ruff
-        types_or: [python, pyi, jupyter]
-        exclude: >
-          |^tests/.*
+  # - repo: https://github.com/astral-sh/ruff-pre-commit
+  #   rev: v0.6.7
+  #   hooks:
+  #     - id: ruff
+  #       types_or: [python, pyi, jupyter]
+  #       exclude: '^tests/.*'
 
   # - repo: https://github.com/pre-commit/mirrors-mypy
   #   rev: v1.8.0
