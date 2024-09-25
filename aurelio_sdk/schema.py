@@ -36,9 +36,12 @@ class TaskStatus(str, Enum):
 
 
 class Usage(BaseModel):
-    tokens: Optional[int] = Field(None, description="Number of tokens used")
-    pages: Optional[int] = Field(None, description="Number of pages processed")
-    seconds: Optional[int] = Field(None, description="Processing time in seconds")
+    tokens: Optional[int] = None
+    pages: Optional[int] = None
+    seconds: Optional[int] = None
+
+    class Config:
+        exclude_none = True
 
 
 class ResponseChunk(BaseModel):
@@ -95,7 +98,7 @@ class ExtractProcessingOptions(BaseModel):
     )
 
 
-class ExtractResponsePayload(BaseModel):
+class ExtractResponse(BaseModel):
     status: TaskStatus = Field(..., description="The status of the extraction process")
     usage: Usage = Field(..., description="Usage")
     message: Optional[str] = Field(None, description="Message")
@@ -104,26 +107,6 @@ class ExtractResponsePayload(BaseModel):
     )
     document: ResponseDocument = Field(..., description="Processed document")
 
-
-class BodyProcessDocumentFileV1ExtractFilePost(BaseModel):
-    file: Any = Field(..., description="The file to extract text from.")
-    quality: ProcessingQuality = Field(
-        ..., description="Processing quality of the document."
-    )
-    chunk: bool = Field(..., description="Whether the document should be chunked")
-    timeout: int = Field(
-        default=30,
-        description="The timeout to keep open the connection to the client in seconds, defaults to 30 seconds, -1 means no timeout.",
-    )
-
-
-class BodyProcessUrlV1ExtractUrlPost(BaseModel):
-    url: str = Field(..., description="The URL of the document file.")
-    quality: ProcessingQuality = Field(
-        ..., description="Processing quality of the document."
-    )
-    chunk: bool = Field(..., description="Whether the document should be chunked")
-    timeout: int = Field(
-        default=30,
-        description="The timeout to keep open the connection to the client in seconds, defaults to 30 seconds, -1 means no timeout.",
-    )
+    class Config:
+        arbitrary_types_allowed = True
+        exclude_none = True

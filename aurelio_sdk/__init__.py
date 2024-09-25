@@ -1,5 +1,10 @@
-from .async_client import AsyncAurelioClient
-from .client import AurelioClient
-from .schema import ChunkingOptions, ChunkResponse
+from .client import AsyncAurelioClient, AurelioClient
+from .schema import ChunkingOptions, ChunkResponse, ExtractResponse
 
-__all__ = ["AurelioClient", "AsyncAurelioClient", "ChunkingOptions", "ChunkResponse"]
+__all__ = [
+    "AurelioClient",
+    "AsyncAurelioClient",
+    "ChunkingOptions",
+    "ChunkResponse",
+    "ExtractResponse",
+]
