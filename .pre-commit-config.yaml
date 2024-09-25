@@ -61,7 +61,7 @@ repos:
   rev: 24.8.0
   hooks:
   - id: black
-    args: [--target-version, py39, -l, "88"]
+    args: [--target-version, py39, -l, "100"]
 
 - repo: https://github.com/asottile/blacken-docs
   rev: 1.16.0
