@@ -54,8 +54,8 @@ repos:
   - id: ruff
     types_or: [python, pyi]
     args: [--fix]
-  - id: ruff-format
-    types_or: [python, pyi]
+  # - id: ruff-format
+  #   types_or: [python, pyi]
 
 - repo: https://github.com/psf/black
   rev: 24.8.0
