@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "aurelio-sdk"
+version = "0.0.1"
+description = "Aurelio Platform SDK"
+authors = ["Team <hello@aurelio.ai>"]
+readme = "README.md"
+packages = [{ include = "aurelio_sdk" }]
+
+[project]
+name = "aurelio-sdk"
+version = "0.0.1"
+license = { file = "LICENSE" }
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aiohttp = "3.10.5"
+requests = "2.32.3"
+pydantic = "2.9.2"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.7"
+black = {extras = ["jupyter"], version = "^24.8.0"}
+types-requests = "^2.32.0.20240914"
+datasets = "^3.0.0"
+mypy = "^1.11.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+per-file-ignores = { "*.ipynb" = ["ALL"] }
+
+[tool.mypy]
+ignore_missing_imports = true

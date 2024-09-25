@@ -1,0 +1,36 @@
+__pycache__
+*.pyc
+.venv
+.DS_Store
+venv/
+.venv*
+/.vscode
+.vscode
+.idea
+**/__pycache__
+**/*.py[cod]
+figures
+tmp
+
+.egg-info
+
+# local env files
+.env*.local
+.env
+mac.env
+secret.env
+
+# Code coverage history
+.coverage
+.coverage.*
+.pytest_cache
+coverage.xml
+test.py
+output
+node_modules
+package-lock.json
+package.json
+test.ipynb
+```
+
+.coding_rules
