@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import IO, Literal, Optional
+from typing import IO, Annotated, List, Literal, Optional, Union
 
 import aiohttp
 
@@ -9,6 +9,7 @@ from aurelio_sdk.schema import (
     ChunkingOptions,
     ChunkRequestPayload,
     ChunkResponse,
+    EmbeddingResponse,
     ExtractResponse,
 )
 
@@ -237,3 +238,42 @@ class AsyncAurelioClient:
             await asyncio.sleep(1)
             document_response = await self.get_document(document_id=document_id)
         return document_response
+
+    async def embedding(
+        self,
+        input: Union[str, List[str]],
+        model: Annotated[str, "Available models: bm25"] = "bm25",
+        timeout: int = 30,
+    ) -> EmbeddingResponse:
+        """Generate embeddings for the given input using the specified model.
+
+        Args:
+            input (Union[str, List[str]]): The text or list of texts to embed.
+            model (str, optional): The model to use for embedding. Defaults to "bm25".
+                Available models: bm25
+            timeout (int): Default 30 seconds. The session timeout to keep open the connection.
+                After the timeout, raise a timeout error.
+
+        Returns:
+            EmbeddingResponse: An object containing the embedding response from the API.
+
+        Raises:
+            AurelioAPIError: If the API request fails.
+
+        Note:
+            This method currently uses a staging API endpoint. TODO: Change to production endpoint.
+        """
+        # client_url = f"{self.base_url}/v1/embeddings"
+        # TODO: change to prod
+        client_url = "https://staging.api.aurelio.ai/v1/embeddings"
+        data = {"input": input, "model": model}
+
+        session_timeout = aiohttp.ClientTimeout(total=timeout)
+        async with aiohttp.ClientSession(timeout=session_timeout) as session:
+            async with session.post(
+                client_url, json=data, headers=self.headers
+            ) as response:
+                if response.status == 200:
+                    return EmbeddingResponse(**await response.json())
+                else:
+                    raise AurelioAPIError(response)

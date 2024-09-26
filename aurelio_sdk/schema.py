@@ -110,3 +110,34 @@ class ExtractResponse(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         exclude_none = True
+
+
+# Embeddings Response
+# ----------------------
+class BM25Embedding(BaseModel):
+    indices: list[int] | list[float] | None = None
+    values: list[float] | list[int] | None = None
+
+
+class EmbeddingUsage(BaseModel):
+    prompt_tokens: int
+    total_tokens: int
+
+
+class EmbeddingDataObject(BaseModel):
+    object: str = Field(default="embedding", description="The object type")
+    index: int = Field(description="The index of the embedding")
+    embedding: BM25Embedding = Field(description="The embedding object")
+
+
+class EmbeddingResponse(BaseModel):
+    """Response object for embeddings"""
+
+    message: str | None = Field(default=None, description="Message")
+    model: str = Field(description="The model name used for embedding")
+    object: str = Field(default="list", description="The object type")
+    usage: EmbeddingUsage = Field(description="Usage")
+    data: list[EmbeddingDataObject] = Field(description="The embedded documents")
+
+    class Config:
+        exclude_none = True
