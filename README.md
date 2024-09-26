@@ -145,6 +145,19 @@ document_response = client.wait_for_document_completion(
 )
 ```
 
+### Embeddings
+
+```python
+from aurelio_sdk import EmbeddingResponse
+
+response: EmbeddingResponse = client.embedding(input="Your text here to be embedded")
+
+# Or with a list of texts
+response: EmbeddingResponse = client.embedding(
+    input=["Your text here to be embedded", "Your text here to be embedded"]
+)
+```
+
 ## Response Structure
 
 The `ExtractResponse` object contains the following key information:
@@ -154,6 +167,13 @@ The `ExtractResponse` object contains the following key information:
 - `message`: Any relevant messages about the extraction process
 - `document`: The extracted document information, including its ID
 - `chunks`: The extracted text, divided into chunks if chunking was enabled
+
+The `EmbeddingResponse` object contains the following key information:
+
+- `message`: Any relevant messages about the embedding process
+- `model`: The model name used for embedding
+- `usage`: Information about token usage, pages processed, and processing time
+- `data`: The embedded documents
 
 ## Best Practices
 

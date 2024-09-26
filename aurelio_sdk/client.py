@@ -1,5 +1,5 @@
 import os
-from typing import IO, Literal, Optional
+from typing import IO, Annotated, List, Literal, Optional, Union
 
 import requests
 
@@ -8,6 +8,7 @@ from aurelio_sdk.schema import (
     ChunkingOptions,
     ChunkRequestPayload,
     ChunkResponse,
+    EmbeddingResponse,
     ExtractResponse,
 )
 
@@ -197,3 +198,34 @@ class AurelioClient:
             time.sleep(1)
             document_response = self.get_document(document_id=document_id)
         return document_response
+
+    def embedding(
+        self,
+        input: Union[str, List[str]],
+        model: Annotated[str, "Available models: bm25"] = "bm25",
+    ) -> EmbeddingResponse:
+        """Generate embeddings for the given input using the specified model.
+
+        Args:
+            input (Union[str, List[str]]): The text or list of texts to embed.
+            model (str, optional): The model to use for embedding. Defaults to "bm25".
+                Available models: bm25
+
+        Returns:
+            EmbeddingResponse: An object containing the embedding response from the API.
+
+        Raises:
+            AurelioAPIError: If the API request fails.
+
+        Note:
+            This method currently uses a staging API endpoint. TODO: Change to production endpoint.
+        """
+        # client_url = f"{self.base_url}/v1/embeddings"
+        # TODO: change to prod
+        client_url = "https://staging.api.aurelio.ai/v1/embeddings"
+        data = {"input": input, "model": model}
+        response = requests.post(client_url, json=data, headers=self.headers)
+        if response.status_code == 200:
+            return EmbeddingResponse(**response.json())
+        else:
+            raise AurelioAPIError(response)
