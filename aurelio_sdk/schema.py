@@ -40,7 +40,7 @@ class Usage(BaseModel):
     pages: Optional[int] = None
     seconds: Optional[int] = None
 
-    class Config:
+    class ConfigDict:
         exclude_none = True
 
 
@@ -107,6 +107,6 @@ class ExtractResponse(BaseModel):
     )
     document: ResponseDocument = Field(..., description="Processed document")
 
-    class Config:
+    class ConfigDict:
         arbitrary_types_allowed = True
         exclude_none = True
