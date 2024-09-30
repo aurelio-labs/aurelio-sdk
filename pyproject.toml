@@ -13,9 +13,9 @@ license = { file = "LICENSE" }
 
 [tool.poetry.dependencies]
 python = "^3.9, <4.0"
-aiohttp = "3.10.5"
-requests = "2.32.3"
-pydantic = "2.9.2"
+aiohttp = "^3.10.5"
+requests = "^2.32.3"
+pydantic = "^2.9.2"
 
 
 [tool.poetry.group.dev.dependencies]
