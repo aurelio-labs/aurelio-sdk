@@ -1,9 +1,11 @@
+import logging
 import os
 from typing import IO, Annotated, List, Literal, Optional, Union
 
 import requests
 
-from aurelio_sdk.exceptions import AurelioAPIError
+from aurelio_sdk.exceptions import APIError
+from aurelio_sdk.logger import logger
 from aurelio_sdk.schema import (
     ChunkingOptions,
     ChunkRequestPayload,
@@ -43,11 +45,16 @@ class AurelioClient:
     """
 
     def __init__(
-        self, api_key: Optional[str] = None, base_url: str = "https://api.aurelio.ai"
+        self,
+        api_key: Optional[str] = None,
+        base_url: str = "https://api.aurelio.ai",
+        debug: bool = False,
     ):
         self.base_url = base_url
 
         self.api_key = api_key or os.environ.get("AURELIO_API_KEY")
+        if debug:
+            logger.setLevel(logging.DEBUG)
 
         if not self.api_key:
             raise ValueError(
@@ -82,7 +89,7 @@ class AurelioClient:
         if response.status_code == 200:
             return ChunkResponse(**response.json())
         else:
-            raise AurelioAPIError(response)
+            raise APIError(response)
 
     def extract_file(
         self,
@@ -120,7 +127,7 @@ class AurelioClient:
         if response.status_code == 200:
             return ExtractResponse(**response.json())
         else:
-            raise AurelioAPIError(response)
+            raise APIError(response)
 
     def extract_url(
         self,
@@ -152,7 +159,7 @@ class AurelioClient:
         if response.status_code == 200:
             return ExtractResponse(**response.json())
         else:
-            raise AurelioAPIError(response)
+            raise APIError(response)
 
     def get_document(self, document_id: str) -> ExtractResponse:
         """
@@ -169,7 +176,7 @@ class AurelioClient:
         if response.status_code == 200:
             return ExtractResponse(**response.json())
         else:
-            raise AurelioAPIError(response)
+            raise APIError(response)
 
     def wait_for_document_completion(
         self, document_id: str, timeout: int = 300
@@ -228,4 +235,4 @@ class AurelioClient:
         if response.status_code == 200:
             return EmbeddingResponse(**response.json())
         else:
-            raise AurelioAPIError(response)
+            raise APIError(response)

@@ -1,10 +1,14 @@
 import asyncio
+import logging
 import os
+import time
 from typing import IO, Annotated, List, Literal, Optional, Union
 
 import aiohttp
 
-from aurelio_sdk.exceptions import AurelioAPIError
+from aurelio_sdk.const import POLLING_INTERVAL, WAIT_TIME_BEFORE_POLLING
+from aurelio_sdk.exceptions import APIError, APITimeoutError
+from aurelio_sdk.logger import logger
 from aurelio_sdk.schema import (
     ChunkingOptions,
     ChunkRequestPayload,
@@ -44,11 +48,16 @@ class AsyncAurelioClient:
     """
 
     def __init__(
-        self, api_key: Optional[str] = None, base_url: str = "https://api.aurelio.ai"
+        self,
+        api_key: Optional[str] = None,
+        base_url: str = "https://api.aurelio.ai",
+        debug: bool = False,
     ):
         self.base_url = base_url
 
         self.api_key = api_key or os.environ.get("AURELIO_API_KEY")
+        if debug:
+            logger.setLevel(logging.DEBUG)
 
         if not self.api_key:
             raise ValueError(
@@ -93,7 +102,7 @@ class AsyncAurelioClient:
                     return ChunkResponse(**data)
                 else:
                     error_content = await response.text()
-                    raise AurelioAPIError(
+                    raise APIError(
                         f"API request failed with status {response.status}: {error_content}"
                     )
 
@@ -140,14 +149,14 @@ class AsyncAurelioClient:
                 if response.status == 200:
                     return ExtractResponse(**await response.json())
                 else:
-                    raise AurelioAPIError(response)
+                    raise APIError(response)
 
     async def extract_url(
         self,
         url: str,
         quality: Literal["low", "high"],
         chunk: bool,
-        timeout: int = 30,
+        wait: int = 30,
     ) -> ExtractResponse:
         """Process a document from a URL synchronously.
 
@@ -155,35 +164,54 @@ class AsyncAurelioClient:
             url: The URL of the document file.
             quality: Processing quality of the document, "low" or "high".
             chunk: Whether the document should be chunked.
-            timeout: Default 30 seconds. The timeout to keep open the connection
-                to the client in seconds. -1 means no timeout.
-                After the timeout, the returns document ID and status "pending"
-
+            wait: Wait for document completion. Default 30 seconds.
+                `-1` means wait till completion. After the wait time,
+                the returns document ID and status "pending"
         Returns:
             ExtractResponse: An object containing the response from the API.
         """
-        client_url = f"{self.base_url}/v1/extract/url"
 
+        client_url = f"{self.base_url}/v1/extract/url"
         data = aiohttp.FormData()
         data.add_field("url", url)
         data.add_field("quality", quality)
         data.add_field("chunk", str(chunk))
-        data.add_field("timeout", str(timeout))
+        data.add_field("timeout", WAIT_TIME_BEFORE_POLLING)
 
-        if timeout <= 0:
+        # Set session timeout
+        if wait <= 0:
             session_timeout = None
         else:
-            # Add 1 second to the timeout to avoid timeout error before the request
-            session_timeout = aiohttp.ClientTimeout(total=timeout + 1)
+            # Add 1 second to the timeout to get Document ID instantly
+            session_timeout = aiohttp.ClientTimeout(total=wait + 1)
 
-        async with aiohttp.ClientSession(timeout=session_timeout) as session:
-            async with session.post(
-                client_url, data=data, headers=self.headers
-            ) as response:
-                if response.status == 200:
-                    return ExtractResponse(**await response.json())
-                else:
-                    raise AurelioAPIError(response)
+        document_id = None
+        try:
+            async with aiohttp.ClientSession(timeout=session_timeout) as session:
+                async with session.post(
+                    client_url, data=data, headers=self.headers, timeout=session_timeout
+                ) as response:
+                    if response.status == 200:
+                        extract_response = ExtractResponse(**await response.json())
+                        document_id = extract_response.document.id
+                    else:
+                        raise APIError(response)
+
+            # Start polling if the document is not completed or failed
+            logger.debug("Started polling for document completion")
+            if extract_response.status not in [
+                "completed",
+                "failed",
+            ]:
+                return await self.wait_for_document_completion(
+                    document_id=document_id, wait=wait
+                )
+            else:
+                return extract_response
+        except asyncio.TimeoutError:
+            raise APITimeoutError(document_id=document_id) from None
+        except Exception as e:
+            raise APIError(response) from e
 
     async def get_document(
         self, document_id: str, timeout: int = 30
@@ -202,16 +230,18 @@ class AsyncAurelioClient:
         client_url = f"{self.base_url}/v1/extract/document/{document_id}"
 
         session_timeout = aiohttp.ClientTimeout(total=timeout)
-
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
-            async with session.get(client_url, headers=self.headers) as response:
-                if response.status == 200:
-                    return ExtractResponse(**await response.json())
-                else:
-                    raise AurelioAPIError(response)
+            try:
+                async with session.get(client_url, headers=self.headers) as response:
+                    if response.status == 200:
+                        return ExtractResponse(**await response.json())
+                    else:
+                        raise APIError(response)
+            except aiohttp.ConnectionTimeoutError as e:
+                raise APITimeoutError(document_id=document_id) from e
 
     async def wait_for_document_completion(
-        self, document_id: str, timeout: int = 300
+        self, document_id: str, wait: int = 300
     ) -> ExtractResponse:
         """
         Waits for the document to reach 'completed' status or until timeout.
@@ -219,24 +249,32 @@ class AsyncAurelioClient:
         Args:
             client: The client instance to interact with the API.
             document_id: The ID of the document to monitor.
-            timeout: Maximum time to wait in seconds (default is 300 seconds).
+            wait: Maximum time to wait in seconds (default is 300 seconds).
                 After the timeout, raise a timeout error.
 
         Returns:
             The final document response.
         """
-        import time
-
         start_time = time.time()
         document_response = await self.get_document(document_id=document_id)
 
-        # Poll until document status is 'completed' or timeout is reached
+        # Poll until document status is 'completed' or 'failed' or timeout is reached
+        timeout_reached = False
         while (
-            document_response.status != "completed"
-            and time.time() - start_time < timeout
+            document_response.status not in ["completed", "failed"]
+            and not timeout_reached
         ):
-            await asyncio.sleep(1)
+            await asyncio.sleep(POLLING_INTERVAL)
             document_response = await self.get_document(document_id=document_id)
+            logger.debug(
+                f"Polling the document {document_id}: {document_response.status}"
+            )
+            if time.time() - start_time > wait:
+                timeout_reached = True
+
+        if timeout_reached:
+            logger.debug(f"Timeout reached while waiting for document {document_id}")
+
         return document_response
 
     async def embedding(
@@ -276,4 +314,4 @@ class AsyncAurelioClient:
                 if response.status == 200:
                     return EmbeddingResponse(**await response.json())
                 else:
-                    raise AurelioAPIError(response)
+                    raise APIError(response)
