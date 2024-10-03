@@ -103,10 +103,11 @@ class AsyncAurelioClient:
                     data = await response.json()
                     return ChunkResponse(**data)
                 else:
-                    error_content = await response.text()
-                    raise APIError(
-                        f"API request failed with status {response.status}: {error_content}"
-                    )
+                    try:
+                        error_content = await response.json()
+                    except Exception:
+                        error_content = await response.text()
+                    raise APIError(response.status, error_content)
 
     async def extract_file(
         self,
@@ -167,7 +168,11 @@ class AsyncAurelioClient:
                         extract_response = ExtractResponse(**await response.json())
                         document_id = extract_response.document.id
                     else:
-                        raise APIError(response)
+                        try:
+                            error_content = await response.json()
+                        except Exception:
+                            error_content = await response.text()
+                        raise APIError(response.status, error_content)
 
             if wait == 0:
                 return extract_response
@@ -182,7 +187,11 @@ class AsyncAurelioClient:
         except asyncio.TimeoutError:
             raise APITimeoutError(document_id=document_id) from None
         except Exception as e:
-            raise APIError(response) from e
+            try:
+                error_content = await response.json()
+            except Exception:
+                error_content = await response.text()
+            raise APIError(response.status, error_content) from e
 
     async def extract_url(
         self,
@@ -240,7 +249,11 @@ class AsyncAurelioClient:
                         extract_response = ExtractResponse(**await response.json())
                         document_id = extract_response.document.id
                     else:
-                        raise APIError(response)
+                        try:
+                            error_content = await response.json()
+                        except Exception:
+                            error_content = await response.text()
+                        raise APIError(response.status, error_content)
 
             if wait == 0:
                 return extract_response
@@ -255,7 +268,11 @@ class AsyncAurelioClient:
         except asyncio.TimeoutError:
             raise APITimeoutError(document_id=document_id) from None
         except Exception as e:
-            raise APIError(response) from e
+            try:
+                error_content = await response.json()
+            except Exception:
+                error_content = await response.text()
+            raise APIError(response.status, error_content) from e
 
     async def get_document(
         self, document_id: str, timeout: int = 30
@@ -280,7 +297,11 @@ class AsyncAurelioClient:
                     if response.status == 200:
                         return ExtractResponse(**await response.json())
                     else:
-                        raise APIError(response)
+                        try:
+                            error_content = await response.json()
+                        except Exception:
+                            error_content = await response.text()
+                        raise APIError(response.status, error_content)
             except aiohttp.ConnectionTimeoutError as e:
                 raise APITimeoutError(document_id=document_id) from e
 
@@ -361,4 +382,8 @@ class AsyncAurelioClient:
                 if response.status == 200:
                     return EmbeddingResponse(**await response.json())
                 else:
-                    raise APIError(response)
+                    try:
+                        error_content = await response.json()
+                    except Exception:
+                        error_content = await response.text()
+                    raise APIError(response.status, error_content)
