@@ -63,19 +63,19 @@ class ContextFilter(logging.Filter):
 
 
 def setup_custom_logger(name: str) -> CustomLogger:
-    match os.getenv("LOG_LEVEL", "INFO"):
-        case "DEBUG":
-            level = logging.DEBUG
-        case "INFO":
-            level = logging.INFO
-        case "WARNING":
-            level = logging.WARNING
-        case "ERROR":
-            level = logging.ERROR
-        case "CRITICAL":
-            level = logging.CRITICAL
-        case _:
-            level = logging.INFO
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    if log_level == "DEBUG":
+        level = logging.DEBUG
+    elif log_level == "INFO":
+        level = logging.INFO
+    elif log_level == "WARNING":
+        level = logging.WARNING
+    elif log_level == "ERROR":
+        level = logging.ERROR
+    elif log_level == "CRITICAL":
+        level = logging.CRITICAL
+    else:
+        level = logging.INFO
     logging.setLoggerClass(CustomLogger)
     logging.basicConfig(
         level=level,
