@@ -115,8 +115,8 @@ class ExtractResponse(BaseModel):
 # Embeddings Response
 # ----------------------
 class BM25Embedding(BaseModel):
-    indices: list[int] | list[float] | None = None
-    values: list[float] | list[int] | None = None
+    indices: list[int]
+    values: list[float]
 
 
 class EmbeddingUsage(BaseModel):

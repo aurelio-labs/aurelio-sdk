@@ -1,5 +1,5 @@
 format:
-	poetry run black --target-version py39 -l 88 .
+	# poetry run black --target-version py39 -l 88 .
 	poetry run ruff check --select I --fix .
 
 PYTHON_FILES=.
