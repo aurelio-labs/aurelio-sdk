@@ -110,7 +110,7 @@ class AsyncAurelioClient:
 
     async def extract_file(
         self,
-        file: IO[bytes],
+        file: Union[IO[bytes], bytes],
         quality: Literal["low", "high"],
         chunk: bool,
         wait: int = 30,
@@ -119,7 +119,7 @@ class AsyncAurelioClient:
         """Process a document from a file asynchronously.
 
         Args:
-            file (IO[bytes]): The file to extract text from (PDF, MP4).
+            file (Union[IO[bytes], bytes]): The file to extract text from (PDF, MP4).
             quality (Literal["low", "high"]): Processing quality of the document.
             chunk (bool): Whether the document should be chunked.
             wait (int): Time to wait for document completion in seconds. Default is 30.
