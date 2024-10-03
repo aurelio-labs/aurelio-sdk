@@ -77,9 +77,8 @@ from aurelio_sdk import ExtractResponse
 file_path = "path/to/your/file.pdf"
 
 with open(file_path, "rb") as file:
-    # timeout -1 means no timeout
     response_pdf_file: ExtractResponse = client.extract_file(
-        file=file, quality="low", chunk=True, timeout=-1
+        file=file, quality="low", chunk=True, wait=-1, enable_polling=True
     )
 ```
 
@@ -92,9 +91,8 @@ from aurelio_sdk import ExtractResponse
 file_path = "path/to/your/file.mp4"
 
 with open(file_path, "rb") as file:
-    # timeout -1 means no timeout
     response_video_file: ExtractResponse = client.extract_file(
-        file=file, quality="low", chunk=True, timeout=-1
+        file=file, quality="low", chunk=True, wait=-1, enable_polling=True
     )
 ```
 
@@ -108,7 +106,7 @@ from aurelio_sdk import ExtractResponse
 # From URL
 url = "https://arxiv.org/pdf/2408.15291"
 response_pdf_url: ExtractResponse = client.extract_url(
-    url=url, quality="low", chunk=True, timeout=-1
+    url=url, quality="low", chunk=True, wait=-1, enable_polling=True
 )
 ```
 
@@ -120,17 +118,17 @@ from aurelio_sdk import ExtractResponse
 # From URL
 url = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
 response_video_url: ExtractResponse = client.extract_url(
-    url=url, quality="low", chunk=True, timeout=-1
+    url=url, quality="low", chunk=True, wait=-1, enable_polling=True
 )
 ```
 
-### Handling Timeouts and Checking Document Status
+### Waiting for completion and checking document atatus
 
 ```python
 # Set timeout for large files with `high` quality
 # Timeout is set to 10 seconds
 response_pdf_url: ExtractResponse = client.extract_url(
-    url="https://arxiv.org/pdf/2408.15291", quality="high", chunk=True, timeout=10
+    url="https://arxiv.org/pdf/2408.15291", quality="high", chunk=True, wait=10
 )
 
 # Get document status and response
@@ -140,8 +138,8 @@ document_response: ExtractResponse = client.get_document(
 print("Status:", document_response.status)
 
 # Use a pre-built function, which helps to avoid long hanging requests (Recommended)
-document_response = client.wait_for_document_completion(
-    document_id=response_pdf_file.document.id, timeout=300
+document_response = client.wait_for(
+    document_id=response_pdf_file.document.id, wait=300
 )
 ```
 
@@ -150,7 +148,9 @@ document_response = client.wait_for_document_completion(
 ```python
 from aurelio_sdk import EmbeddingResponse
 
-response: EmbeddingResponse = client.embedding(input="Your text here to be embedded")
+response: EmbeddingResponse = client.embedding(
+    input="Your text here to be embedded",
+    model="bm25")
 
 # Or with a list of texts
 response: EmbeddingResponse = client.embedding(
@@ -177,12 +177,8 @@ The `EmbeddingResponse` object contains the following key information:
 
 ## Best Practices
 
-1. Use appropriate timeouts based on your use case and file sizes.
+1. Use appropriate wait times based on your use case and file sizes.
 2. Use async client for better performance.
-3. For large files or when processing might take longer, use the `wait_for_document_completion` method to avoid long-hanging requests.
+3. For large files or when processing might take longer, enable polling for long-hanging requests.
 4. Always handle potential exceptions and check the status of the response.
 5. Adjust the `quality` parameter based on your needs. "low" is faster but less accurate, while "high" is slower but more accurate.
-
-## Support
-
-For any issues or questions, please contact Aurelio support or refer to the official documentation.

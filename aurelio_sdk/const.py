@@ -1,0 +1,2 @@
+WAIT_TIME_BEFORE_POLLING = 1  # seconds
+POLLING_INTERVAL = 1  # second
