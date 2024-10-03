@@ -49,9 +49,7 @@ class ResponseChunk(BaseModel):
     content: str = Field(..., description="Content of the chunk")
     chunk_index: int = Field(..., description="Index of the chunk in the document")
     num_tokens: int = Field(..., description="Number of tokens in the chunk")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Metadata of the chunk"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata of the chunk")
 
 
 class SourceType(str, Enum):
@@ -68,12 +66,8 @@ class ResponseDocument(BaseModel):
         ..., description="Type of the document e.g. video/mp4, application/pdf"
     )
     num_chunks: int = Field(..., description="Total number of chunks in the document")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Metadata for users"
-    )
-    chunks: List[ResponseChunk] = Field(
-        default_factory=list, description="Chunks of the document"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata for users")
+    chunks: List[ResponseChunk] = Field(default_factory=list, description="Chunks of the document")
 
 
 class ChunkResponse(BaseModel):
@@ -93,9 +87,7 @@ class ProcessingQuality(str, Enum):
 
 class ExtractProcessingOptions(BaseModel):
     chunk: bool = Field(..., description="Whether the document should be chunked")
-    quality: ProcessingQuality = Field(
-        ..., description="Processing quality of the document"
-    )
+    quality: ProcessingQuality = Field(..., description="Processing quality of the document")
 
 
 class ExtractResponse(BaseModel):
@@ -115,8 +107,8 @@ class ExtractResponse(BaseModel):
 # Embeddings Response
 # ----------------------
 class BM25Embedding(BaseModel):
-    indices: list[int] | list[float] | None = None
-    values: list[float] | list[int] | None = None
+    indices: list[int]
+    values: list[float]
 
 
 class EmbeddingUsage(BaseModel):
