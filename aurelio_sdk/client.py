@@ -91,7 +91,11 @@ class AurelioClient:
         if response.status_code == 200:
             return ChunkResponse(**response.json())
         else:
-            raise APIError(response)
+            try:
+                error_content = response.json()
+            except Exception:
+                error_content = response.text
+            raise APIError(response.status_code, error_content)
 
     def extract_file(
         self,
@@ -152,7 +156,11 @@ class AurelioClient:
                 extract_response = ExtractResponse(**response.json())
                 document_id = extract_response.document.id
             else:
-                raise APIError(response)
+                try:
+                    error_content = response.json()
+                except Exception:
+                    error_content = response.text
+                raise APIError(response.status_code, error_content)
 
             if wait == 0:
                 return extract_response
@@ -167,7 +175,11 @@ class AurelioClient:
         except requests.exceptions.Timeout:
             raise APITimeoutError(document_id=document_id) from None
         except Exception as e:
-            raise APIError(response) from e
+            try:
+                error_content = response.json()
+            except Exception:
+                error_content = response.text
+            raise APIError(response.status_code, error_content) from e
 
     def extract_url(
         self,
@@ -221,7 +233,11 @@ class AurelioClient:
                 extract_response = ExtractResponse(**response.json())
                 document_id = extract_response.document.id
             else:
-                raise APIError(response)
+                try:
+                    error_content = response.json()
+                except Exception:
+                    error_content = response.text
+                raise APIError(response.status_code, error_content)
 
             if wait == 0:
                 return extract_response
@@ -236,7 +252,11 @@ class AurelioClient:
         except requests.exceptions.Timeout:
             raise APITimeoutError(document_id=document_id) from None
         except Exception as e:
-            raise APIError(response) from e
+            try:
+                error_content = response.json()
+            except Exception:
+                error_content = response.text
+            raise APIError(response.status_code, error_content) from e
 
     def get_document(self, document_id: str, timeout: int = 30) -> ExtractResponse:
         """
@@ -254,11 +274,19 @@ class AurelioClient:
             if response.status_code == 200:
                 return ExtractResponse(**response.json())
             else:
-                raise APIError(response)
+                try:
+                    error_content = response.json()
+                except Exception:
+                    error_content = response.text
+                raise APIError(response.status_code, error_content)
         except requests.exceptions.Timeout:
             raise APITimeoutError(document_id=document_id) from None
         except Exception as e:
-            raise APIError(response) from e
+            try:
+                error_content = response.json()
+            except Exception:
+                error_content = response.text
+            raise APIError(response.status_code, error_content) from e
 
     def wait_for(self, document_id: str, wait: int = 300) -> ExtractResponse:
         """
@@ -335,8 +363,16 @@ class AurelioClient:
             if response.status_code == 200:
                 return EmbeddingResponse(**response.json())
             else:
-                raise APIError(response)
+                try:
+                    error_content = response.json()
+                except Exception:
+                    error_content = response.text
+                raise APIError(response.status_code, error_content)
         except requests.exceptions.Timeout:
             raise APITimeoutError() from None
         except Exception as e:
-            raise APIError(response) from e
+            try:
+                error_content = response.json()
+            except Exception:
+                error_content = response.text
+            raise APIError(response.status_code, error_content) from e

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aurelio-sdk"
-version = "0.0.4"
+version = "0.0.5"
 description = "Aurelio Platform SDK"
 authors = ["Team <hello@aurelio.ai>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ packages = [{ include = "aurelio_sdk" }]
 
 [project]
 name = "aurelio-sdk"
-version = "0.0.4"
+version = "0.0.5"
 license = { file = "LICENSE" }
 
 [tool.poetry.dependencies]
