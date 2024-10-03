@@ -36,7 +36,9 @@ class AsyncAurelioClient:
     Args:
         api_key (Optional[str]): The API key for authentication. If not provided,
             it will attempt to use the AURELIO_API_KEY environment variable.
-        base_url (str): The base URL for the Aurelio API. Defaults to "https://api.aurelio.ai".
+        base_url (str): The base URL for the Aurelio API.
+        Defaults to "https://api.aurelio.ai".
+        debug (bool): Whether to enable debug logging. Defaults to False.
 
     Raises:
         ValueError: If no API key is provided or found in the environment variables.
@@ -111,20 +113,29 @@ class AsyncAurelioClient:
         file: IO[bytes],
         quality: Literal["low", "high"],
         chunk: bool,
-        timeout: int = 30,
+        wait: int = 30,
+        enable_polling: bool = True,
     ) -> ExtractResponse:
-        """Processes a document from an uploaded file asynchronously.
+        """Process a document from a file asynchronously.
 
         Args:
             file (IO[bytes]): The file to extract text from (PDF, MP4).
-            quality (str): Processing quality of the document, either "low" or "high".
+            quality (Literal["low", "high"]): Processing quality of the document.
             chunk (bool): Whether the document should be chunked.
-            timeout (int): Default 30 seconds. The timeout to keep open the connection
-                to the client in seconds. -1 means no timeout.
-                After the timeout, the returns document ID and status "pending"
+            wait (int): Time to wait for document completion in seconds. Default is 30.
+                If set to -1, waits until completion. If the wait time is exceeded,
+                returns the document ID with a "pending" status.
+            enable_polling (bool): If False, disables polling for document completion.
+                Instead, maintains a continuous connection to the API until the
+                document is completed. Default is True (polling is enabled).
 
         Returns:
-            ExtractResponse: An object containing the response from the API.
+            ExtractResponse: An object containing the response from the API, including
+            the processed document information and status.
+
+        Raises:
+            APITimeoutError: If the request times out.
+            APIError: If there's an error in the API response.
         """
         client_url = f"{self.base_url}/v1/extract/file"
 
@@ -134,62 +145,23 @@ class AsyncAurelioClient:
         data.add_field("file", file, filename=filename)
         data.add_field("quality", quality)
         data.add_field("chunk", str(chunk))
-        data.add_field("timeout", str(timeout))
 
-        if timeout <= 0:
-            session_timeout = None
-        else:
-            # Add 1 second to the timeout to avoid timeout error before the request
-            session_timeout = aiohttp.ClientTimeout(total=timeout + 1)
+        # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
+        # If polling is disabled, use the full wait time
+        initial_request_timeout = WAIT_TIME_BEFORE_POLLING if enable_polling else wait
+        data.add_field("timeout", str(initial_request_timeout))
 
-        async with aiohttp.ClientSession(timeout=session_timeout) as session:
-            async with session.post(
-                client_url, data=data, headers=self.headers
-            ) as response:
-                if response.status == 200:
-                    return ExtractResponse(**await response.json())
-                else:
-                    raise APIError(response)
-
-    async def extract_url(
-        self,
-        url: str,
-        quality: Literal["low", "high"],
-        chunk: bool,
-        wait: int = 30,
-    ) -> ExtractResponse:
-        """Process a document from a URL synchronously.
-
-        Args:
-            url: The URL of the document file.
-            quality: Processing quality of the document, "low" or "high".
-            chunk: Whether the document should be chunked.
-            wait: Wait for document completion. Default 30 seconds.
-                `-1` means wait till completion. After the wait time,
-                the returns document ID and status "pending"
-        Returns:
-            ExtractResponse: An object containing the response from the API.
-        """
-
-        client_url = f"{self.base_url}/v1/extract/url"
-        data = aiohttp.FormData()
-        data.add_field("url", url)
-        data.add_field("quality", quality)
-        data.add_field("chunk", str(chunk))
-        data.add_field("timeout", WAIT_TIME_BEFORE_POLLING)
-
-        # Set session timeout
         if wait <= 0:
             session_timeout = None
         else:
-            # Add 1 second to the timeout to get Document ID instantly
+            # Add 1 second to the timeout to ensure we get the Document ID
             session_timeout = aiohttp.ClientTimeout(total=wait + 1)
 
         document_id = None
         try:
             async with aiohttp.ClientSession(timeout=session_timeout) as session:
                 async with session.post(
-                    client_url, data=data, headers=self.headers, timeout=session_timeout
+                    client_url, data=data, headers=self.headers
                 ) as response:
                     if response.status == 200:
                         extract_response = ExtractResponse(**await response.json())
@@ -197,17 +169,89 @@ class AsyncAurelioClient:
                     else:
                         raise APIError(response)
 
-            # Start polling if the document is not completed or failed
-            logger.debug("Started polling for document completion")
-            if extract_response.status not in [
-                "completed",
-                "failed",
-            ]:
-                return await self.wait_for_document_completion(
-                    document_id=document_id, wait=wait
-                )
-            else:
+            if wait == 0:
                 return extract_response
+
+            # If the document is already processed or polling is disabled,
+            # return the response
+            if extract_response.status in ["completed", "failed"] or not enable_polling:
+                return extract_response
+
+            # Wait for the document to complete processing
+            return await self.wait_for(document_id=document_id, wait=wait)
+        except asyncio.TimeoutError:
+            raise APITimeoutError(document_id=document_id) from None
+        except Exception as e:
+            raise APIError(response) from e
+
+    async def extract_url(
+        self,
+        url: str,
+        quality: Literal["low", "high"],
+        chunk: bool,
+        wait: int = 30,
+        enable_polling: bool = True,
+    ) -> ExtractResponse:
+        """Process a document from a URL asynchronously.
+
+        Args:
+            url (str): The URL of the document file to be processed.
+            quality (Literal["low", "high"]): Processing quality of the document.
+            chunk (bool): Whether the document should be chunked.
+            wait (int): Time to wait for document completion in seconds. Default is 30.
+                If set to -1, waits until completion. If the wait time is exceeded,
+                returns the document ID with a "pending" status.
+            enable_polling (bool): If False, disables polling for document completion.
+                Instead, maintains a continuous connection to the API until the
+                document is completed. Default is True (polling is enabled).
+
+        Returns:
+            ExtractResponse: An object containing the response from the API, including
+            the processed document information and status.
+
+        Raises:
+            APITimeoutError: If the request times out.
+            APIError: If there's an error in the API response.
+        """
+        client_url = f"{self.base_url}/v1/extract/url"
+        data = aiohttp.FormData()
+        data.add_field("url", url)
+        data.add_field("quality", quality)
+        data.add_field("chunk", str(chunk))
+
+        # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
+        # If polling is disabled, use the full wait time
+        initial_request_timeout = WAIT_TIME_BEFORE_POLLING if enable_polling else wait
+        data.add_field("timeout", str(initial_request_timeout))
+
+        if wait <= 0:
+            session_timeout = None
+        else:
+            # Add 1 second to the timeout to ensure we get the Document ID
+            session_timeout = aiohttp.ClientTimeout(total=wait + 1)
+
+        document_id = None
+        try:
+            async with aiohttp.ClientSession(timeout=session_timeout) as session:
+                async with session.post(
+                    client_url, data=data, headers=self.headers
+                ) as response:
+                    if response.status == 200:
+                        extract_response = ExtractResponse(**await response.json())
+                        document_id = extract_response.document.id
+                    else:
+                        raise APIError(response)
+
+            if wait == 0:
+                return extract_response
+
+            # If the document is already processed or polling is disabled,
+            # return the response
+            if extract_response.status in ["completed", "failed"] or not enable_polling:
+                return extract_response
+
+            # Wait for the document to complete processing
+            return await self.wait_for(document_id=document_id, wait=wait)
         except asyncio.TimeoutError:
             raise APITimeoutError(document_id=document_id) from None
         except Exception as e:
@@ -240,11 +284,9 @@ class AsyncAurelioClient:
             except aiohttp.ConnectionTimeoutError as e:
                 raise APITimeoutError(document_id=document_id) from e
 
-    async def wait_for_document_completion(
-        self, document_id: str, wait: int = 300
-    ) -> ExtractResponse:
+    async def wait_for(self, document_id: str, wait: int = 300) -> ExtractResponse:
         """
-        Waits for the document to reach 'completed' status or until timeout.
+        Waits for the document to reach 'completed' or 'failed' status or until timeout.
 
         Args:
             client: The client instance to interact with the API.
@@ -255,51 +297,56 @@ class AsyncAurelioClient:
         Returns:
             The final document response.
         """
+        logger.debug(f"Starting polling for document completion: {document_id}")
         start_time = time.time()
         document_response = await self.get_document(document_id=document_id)
 
-        # Poll until document status is 'completed' or 'failed' or timeout is reached
+        FINAL_STATES = ["completed", "failed"]
         timeout_reached = False
-        while (
-            document_response.status not in ["completed", "failed"]
-            and not timeout_reached
-        ):
+        end_time = start_time + wait if wait >= 0 else float("inf")
+
+        while document_response.status not in FINAL_STATES and not timeout_reached:
             await asyncio.sleep(POLLING_INTERVAL)
+
+            # Check for timeout
+            if time.time() > end_time:
+                timeout_reached = True
+                logger.debug(
+                    f"Timeout reached while waiting for document {document_id}"
+                )
+                break
+
             document_response = await self.get_document(document_id=document_id)
             logger.debug(
-                f"Polling the document {document_id}: {document_response.status}"
+                f"Polling document {document_id}: status={document_response.status}"
             )
-            if time.time() - start_time > wait:
-                timeout_reached = True
-
-        if timeout_reached:
-            logger.debug(f"Timeout reached while waiting for document {document_id}")
-
         return document_response
 
     async def embedding(
         self,
         input: Union[str, List[str]],
-        model: Annotated[str, "Available models: bm25"] = "bm25",
+        model: Annotated[str, Literal["bm25"]],
         timeout: int = 30,
     ) -> EmbeddingResponse:
         """Generate embeddings for the given input using the specified model.
 
         Args:
             input (Union[str, List[str]]): The text or list of texts to embed.
-            model (str, optional): The model to use for embedding. Defaults to "bm25".
-                Available models: bm25
-            timeout (int): Default 30 seconds. The session timeout to keep open the connection.
-                After the timeout, raise a timeout error.
+            model (str, optional): The model to use for embedding.
+                Currently, only "bm25" is available.
+            timeout (int, optional): The maximum time in seconds to keep the connection open.
+                Defaults to 30 seconds. If exceeded, a timeout error is raised.
 
         Returns:
             EmbeddingResponse: An object containing the embedding response from the API.
 
         Raises:
-            AurelioAPIError: If the API request fails.
+            APIError: If the API request fails.
+            APITimeoutError: If the request exceeds the specified timeout.
 
         Note:
-            This method currently uses a staging API endpoint. TODO: Change to production endpoint.
+            This method currently uses a staging API endpoint.
+            TODO: Change to production endpoint.
         """
         # client_url = f"{self.base_url}/v1/embeddings"
         # TODO: change to prod
