@@ -347,14 +347,8 @@ class AurelioClient:
         Raises:
             APIError: If the API request fails.
             APITimeoutError: If the request exceeds the specified timeout.
-
-        Note:
-            This method currently uses a staging API endpoint.
-            TODO: Change to production endpoint.
         """
-        # client_url = f"{self.base_url}/v1/embeddings"
-        # TODO: change to prod
-        client_url = "https://staging.api.aurelio.ai/v1/embeddings"
+        client_url = f"{self.base_url}/v1/embeddings"
         data = {"input": input, "model": model}
         try:
             response = requests.post(
