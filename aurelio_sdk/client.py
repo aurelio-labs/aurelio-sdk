@@ -134,12 +134,12 @@ class AurelioClient:
         data = {
             "quality": quality,
             "chunk": chunk,
-            "timeout": wait,
+            "wait": wait,
         }
 
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
         if enable_polling:
-            data["timeout"] = WAIT_TIME_BEFORE_POLLING
+            data["wait"] = WAIT_TIME_BEFORE_POLLING
 
         document_id = None
         try:
@@ -215,12 +215,12 @@ class AurelioClient:
             "url": url,
             "quality": quality,
             "chunk": chunk,
-            "timeout": wait,
+            "wait": wait,
         }
 
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
         if enable_polling:
-            data["timeout"] = WAIT_TIME_BEFORE_POLLING
+            data["wait"] = WAIT_TIME_BEFORE_POLLING
 
         document_id = None
         try:

@@ -150,7 +150,7 @@ class AsyncAurelioClient:
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
         # If polling is disabled, use the full wait time
         initial_request_timeout = WAIT_TIME_BEFORE_POLLING if enable_polling else wait
-        data.add_field("timeout", str(initial_request_timeout))
+        data.add_field("wait", str(initial_request_timeout))
 
         if wait <= 0:
             session_timeout = None
@@ -231,7 +231,7 @@ class AsyncAurelioClient:
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
         # If polling is disabled, use the full wait time
         initial_request_timeout = WAIT_TIME_BEFORE_POLLING if enable_polling else wait
-        data.add_field("timeout", str(initial_request_timeout))
+        data.add_field("wait", str(initial_request_timeout))
 
         if wait <= 0:
             session_timeout = None
