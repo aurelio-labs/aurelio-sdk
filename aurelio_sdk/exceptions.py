@@ -13,14 +13,18 @@ class APIError(Exception):
         document_id: Optional[str] = None,
         base_url: Optional[str] = None,
     ):
-        message = f"[AurelioSDK] API request failed: {message}."
+        # Avoid duplicating the error message
+        if message.startswith("[AurelioSDK] API request failed"):
+            full_message = message
+        else:
+            full_message = f"[AurelioSDK] API request failed: {message}."
         if document_id:
-            message += f" Document ID: {document_id}"
+            full_message += f" Document ID: {document_id}"
         if status_code:
-            message += f" Status code: {status_code}"
+            full_message += f" Status code: {status_code}"
         if base_url:
-            message += f" Base URL: {base_url}"
-        super().__init__(message)
+            full_message += f" Base URL: {base_url}"
+        super().__init__(full_message)
 
 
 class APITimeoutError(TimeoutError):
