@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import time
-from typing import IO, Annotated, List, Literal, Optional, Union
+from typing import IO, Annotated, AsyncGenerator, List, Literal, Optional, Union
 
 import aiohttp
 
@@ -125,7 +125,7 @@ class AsyncAurelioClient:
 
     async def extract_file(
         self,
-        file: Union[IO[bytes], bytes],
+        file: Union[IO[bytes], bytes, AsyncGenerator[bytes, None]],
         quality: Literal["low", "high"],
         chunk: bool,
         wait: int = 30,
@@ -157,14 +157,25 @@ class AsyncAurelioClient:
         filename = getattr(file, "name", "document.pdf")
 
         data = aiohttp.FormData()
-        data.add_field("file", file, filename=filename)
+
+        # Add file field
+        if isinstance(file, AsyncGenerator):
+            # Wrap the AsyncGenerator with an AsyncIterablePayload
+            file_payload = aiohttp.payload.AsyncIterablePayload(file)
+            data.add_field(
+                "file",
+                file_payload,
+                filename=filename,
+                content_type="application/octet-stream",
+            )
+        else:
+            data.add_field("file", file, filename=filename)
+
+        # Add other fields
         data.add_field("quality", quality)
         data.add_field("chunk", str(chunk))
-
-        # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
-        # If polling is disabled, use the full wait time
-        initial_request_timeout = WAIT_TIME_BEFORE_POLLING if enable_polling else wait
-        data.add_field("wait", str(initial_request_timeout))
+        initial_wait = WAIT_TIME_BEFORE_POLLING if enable_polling else wait
+        data.add_field("wait", str(initial_wait))
 
         if wait <= 0:
             session_timeout = None
@@ -173,11 +184,14 @@ class AsyncAurelioClient:
             session_timeout = aiohttp.ClientTimeout(total=wait + 1)
 
         document_id = None
+        status_code = None
+
         try:
             async with aiohttp.ClientSession(timeout=session_timeout) as session:
                 async with session.post(
                     client_url, data=data, headers=self.headers
                 ) as response:
+                    status_code = response.status
                     if response.status == 200:
                         extract_response = ExtractResponse(**await response.json())
                         document_id = extract_response.document.id
@@ -186,10 +200,7 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(
-                            message=error_content,
-                            status_code=response.status,
-                        )
+                        raise ValueError(error_content)
 
             if wait == 0:
                 return extract_response
@@ -207,7 +218,9 @@ class AsyncAurelioClient:
                 timeout=session_timeout.total if session_timeout else None,
             ) from None
         except Exception as e:
-            raise APIError(message=str(e), base_url=self.base_url) from e
+            raise APIError(
+                message=str(e), base_url=self.base_url, status_code=status_code
+            ) from e
 
     async def extract_url(
         self,
