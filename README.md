@@ -122,11 +122,11 @@ response_video_url: ExtractResponse = client.extract_url(
 )
 ```
 
-### Waiting for completion and checking document atatus
+### Waiting for completion and checking document status
 
 ```python
-# Set timeout for large files with `high` quality
-# Timeout is set to 10 seconds
+# Set wait time for large files with `high` quality
+# Wait time is set to 10 seconds
 response_pdf_url: ExtractResponse = client.extract_url(
     url="https://arxiv.org/pdf/2408.15291", quality="high", chunk=True, wait=10
 )

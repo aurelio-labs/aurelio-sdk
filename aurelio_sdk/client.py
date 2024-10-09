@@ -52,17 +52,21 @@ class AurelioClient:
         base_url: str = "https://api.aurelio.ai",
         debug: bool = False,
     ):
-        self.base_url = base_url
+        if not base_url:
+            self.base_url = "https://api.aurelio.ai"
+        else:
+            self.base_url = base_url
 
-        self.api_key = api_key or os.environ.get("AURELIO_API_KEY")
-        if debug:
-            logger.setLevel(logging.DEBUG)
-
+        self.api_key = api_key or os.environ.get("AURELIO_API_KEY", "")
         if not self.api_key:
             raise ValueError(
                 "API key must be provided either as an argument or "
                 "set as AURELIO_API_KEY environment variable."
             )
+
+        if debug:
+            logger.setLevel(logging.DEBUG)
+
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
 
     def chunk(
@@ -85,17 +89,25 @@ class AurelioClient:
         payload = ChunkRequestPayload(
             content=content, processing_options=processing_options
         )
-        response = requests.post(
-            client_url, json=payload.model_dump(), headers=self.headers
-        )
-        if response.status_code == 200:
-            return ChunkResponse(**response.json())
-        else:
-            try:
-                error_content = response.json()
-            except Exception:
-                error_content = response.text
-            raise APIError(response.status_code, error_content)
+        response = None
+        try:
+            response = requests.post(
+                client_url, json=payload.model_dump(), headers=self.headers
+            )
+            if response.status_code == 200:
+                return ChunkResponse(**response.json())
+            else:
+                try:
+                    error_content = response.json()
+                except Exception:
+                    error_content = response.text
+                raise APIError(
+                    message=error_content,
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
+        except Exception as e:
+            raise APIError(message=str(e), base_url=self.base_url) from e
 
     def extract_file(
         self,
@@ -142,6 +154,7 @@ class AurelioClient:
             data["wait"] = WAIT_TIME_BEFORE_POLLING
 
         document_id = None
+        response = None
         try:
             session_timeout = wait + 1 if wait > 0 else None
             response = requests.post(
@@ -160,7 +173,11 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(response.status_code, error_content)
+                raise APIError(
+                    message=error_content,
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
 
             if wait == 0:
                 return extract_response
@@ -173,13 +190,11 @@ class AurelioClient:
             # Wait for the document to complete processing
             return self.wait_for(document_id=document_id, wait=wait)
         except requests.exceptions.Timeout:
-            raise APITimeoutError(document_id=document_id) from None
+            raise APITimeoutError(
+                timeout=session_timeout, base_url=self.base_url
+            ) from None
         except Exception as e:
-            try:
-                error_content = response.json()
-            except Exception:
-                error_content = response.text
-            raise APIError(response.status_code, error_content) from e
+            raise APIError(message=str(e), base_url=self.base_url) from e
 
     def extract_url(
         self,
@@ -223,8 +238,9 @@ class AurelioClient:
             data["wait"] = WAIT_TIME_BEFORE_POLLING
 
         document_id = None
+        response = None
+        session_timeout = wait + 1 if wait > 0 else None
         try:
-            session_timeout = wait + 1 if wait > 0 else None
             response = requests.post(
                 client_url, data=data, headers=self.headers, timeout=session_timeout
             )
@@ -237,7 +253,11 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(response.status_code, error_content)
+                raise APIError(
+                    message=error_content,
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
 
             if wait == 0:
                 return extract_response
@@ -250,13 +270,14 @@ class AurelioClient:
             # Wait for the document to complete processing
             return self.wait_for(document_id=document_id, wait=wait)
         except requests.exceptions.Timeout:
-            raise APITimeoutError(document_id=document_id) from None
+            raise APITimeoutError(
+                timeout=session_timeout, base_url=self.base_url
+            ) from None
         except Exception as e:
-            try:
-                error_content = response.json()
-            except Exception:
-                error_content = response.text
-            raise APIError(response.status_code, error_content) from e
+            raise APIError(
+                message=str(e),
+                base_url=self.base_url,
+            ) from e
 
     def get_document(self, document_id: str, timeout: int = 30) -> ExtractResponse:
         """
@@ -278,15 +299,15 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(response.status_code, error_content)
+                raise APIError(
+                    message=error_content,
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
         except requests.exceptions.Timeout:
-            raise APITimeoutError(document_id=document_id) from None
+            raise APITimeoutError(timeout=timeout, base_url=self.base_url) from None
         except Exception as e:
-            try:
-                error_content = response.json()
-            except Exception:
-                error_content = response.text
-            raise APIError(response.status_code, error_content) from e
+            raise APIError(message=str(e), base_url=self.base_url) from e
 
     def wait_for(self, document_id: str, wait: int = 300) -> ExtractResponse:
         """
@@ -361,12 +382,15 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(response.status_code, error_content)
+                raise APIError(
+                    message=error_content,
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
         except requests.exceptions.Timeout:
-            raise APITimeoutError() from None
+            raise APITimeoutError(timeout=timeout, base_url=self.base_url) from None
         except Exception as e:
-            try:
-                error_content = response.json()
-            except Exception:
-                error_content = response.text
-            raise APIError(response.status_code, error_content) from e
+            raise APIError(
+                message=str(e),
+                base_url=self.base_url,
+            ) from e
