@@ -133,7 +133,7 @@ class EmbeddingDataObject(BaseModel):
 class EmbeddingResponse(BaseModel):
     """Response object for embeddings"""
 
-    message: str | None = Field(default=None, description="Message")
+    message: Optional[str] = Field(default=None, description="Message")
     model: str = Field(description="The model name used for embedding")
     object: str = Field(default="list", description="The object type")
     usage: EmbeddingUsage = Field(description="Usage")
