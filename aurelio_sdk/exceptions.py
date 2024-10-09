@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Optional, Union
 
 
 class APIError(Exception):
@@ -7,13 +7,19 @@ class APIError(Exception):
     """
 
     def __init__(
-        self, status_code: Optional[int], error: Any, document_id: Optional[str] = None
+        self,
+        message: str,
+        status_code: Optional[int] = None,
+        document_id: Optional[str] = None,
+        base_url: Optional[str] = None,
     ):
-        self.status_code = status_code
-        self.error = error
-        message = f"API request failed with status {self.status_code}: {self.error}."
+        message = f"[AurelioSDK] API request failed: {message}."
         if document_id:
             message += f" Document ID: {document_id}"
+        if status_code:
+            message += f" Status code: {status_code}"
+        if base_url:
+            message += f" Base URL: {base_url}"
         super().__init__(message)
 
 
@@ -22,8 +28,14 @@ class APITimeoutError(TimeoutError):
     Exception for timeout errors.
     """
 
-    def __init__(self, document_id: Optional[str] = None):
-        message = "Operation timed out."
-        if document_id:
-            message += f" Document ID: {document_id}"
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        timeout: Optional[Union[int, float]] = None,
+    ):
+        message = "[AurelioSDK] Operation timed out."
+        if timeout:
+            message += f" Timeout value: {timeout}s."
+        if base_url:
+            message += f" Base URL: {base_url}"
         super().__init__(message)

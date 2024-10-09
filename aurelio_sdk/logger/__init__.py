@@ -1,4 +1,3 @@
-import inspect
 import logging
 import os
 from typing import NoReturn, cast
@@ -7,25 +6,6 @@ import colorlog
 
 
 class CustomLogger(logging.Logger):
-
-    def log(self, level, msg, *args, **kwargs):
-        # Enhance the log method to automatically include caller's class and function name
-        frame = inspect.stack()[2]
-        module = inspect.getmodule(frame[0])
-        module_name = module.__name__ if module else "unknown"
-        class_name = (
-            frame[0].f_locals["self"].__class__.__name__
-            if "self" in frame[0].f_locals
-            else ""
-        )
-        func_name = frame[3]
-        prefix = (
-            f"{module_name}:{class_name}:{func_name}"
-            if class_name
-            else f"{module_name}:{func_name}"
-        )
-        super().log(level, f"{prefix}: {msg}", *args, **kwargs)
-
     def error_raise(self, message: str) -> NoReturn:
         self.error(message)
         raise
@@ -34,7 +14,7 @@ class CustomLogger(logging.Logger):
 class CustomFormatter(colorlog.ColoredFormatter):
     def __init__(self):
         super().__init__(
-            "%(log_color)s%(asctime)s %(levelname)s %(name)s %(message)s",
+            "%(log_color)s[AurelioSDK] %(asctime)s %(levelname)s %(filename)s:%(lineno)d|%(funcName)s(): %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
             log_colors={
                 "DEBUG": "cyan",
@@ -80,7 +60,10 @@ def setup_custom_logger(name: str) -> CustomLogger:
     logging.basicConfig(
         level=level,
         datefmt="%Y-%m-%d %H:%M:%S",
-        format="%(asctime)s %(levelname)s %(message)s",
+        format=(
+            "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - "
+            "%(funcName)s() - %(message)s"
+        ),
     )
     logger = cast(CustomLogger, logging.getLogger(name))
     logger.handlers = []

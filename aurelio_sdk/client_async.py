@@ -55,17 +55,21 @@ class AsyncAurelioClient:
         base_url: str = "https://api.aurelio.ai",
         debug: bool = False,
     ):
-        self.base_url = base_url
+        if not base_url:
+            self.base_url = "https://api.aurelio.ai"
+        else:
+            self.base_url = base_url
 
-        self.api_key = api_key or os.environ.get("AURELIO_API_KEY")
-        if debug:
-            logger.setLevel(logging.DEBUG)
-
+        self.api_key = api_key or os.environ.get("AURELIO_API_KEY", "")
         if not self.api_key:
             raise ValueError(
                 "API key must be provided either as an argument or "
                 "set as AURELIO_API_KEY environment variable."
             )
+
+        if debug:
+            logger.setLevel(logging.DEBUG)
+
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
 
     async def chunk(
@@ -94,20 +98,30 @@ class AsyncAurelioClient:
             content=content, processing_options=processing_options
         )
         session_timeout = aiohttp.ClientTimeout(total=timeout)
-
-        async with aiohttp.ClientSession(timeout=session_timeout) as session:
-            async with session.post(
-                client_url, json=payload.model_dump(), headers=self.headers
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return ChunkResponse(**data)
-                else:
-                    try:
-                        error_content = await response.json()
-                    except Exception:
-                        error_content = await response.text()
-                    raise APIError(response.status, error_content)
+        try:
+            async with aiohttp.ClientSession(timeout=session_timeout) as session:
+                async with session.post(
+                    client_url, json=payload.model_dump(), headers=self.headers
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return ChunkResponse(**data)
+                    else:
+                        try:
+                            error_content = await response.json()
+                        except Exception:
+                            error_content = await response.text()
+                        raise APIError(
+                            message=error_content,
+                            status_code=response.status,
+                        )
+        except asyncio.TimeoutError:
+            raise APITimeoutError(
+                timeout=timeout,
+                base_url=self.base_url,
+            ) from None
+        except Exception as e:
+            raise APIError(message=str(e), base_url=self.base_url) from e
 
     async def extract_file(
         self,
@@ -172,7 +186,10 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(response.status, error_content)
+                        raise APIError(
+                            message=error_content,
+                            status_code=response.status,
+                        )
 
             if wait == 0:
                 return extract_response
@@ -185,13 +202,12 @@ class AsyncAurelioClient:
             # Wait for the document to complete processing
             return await self.wait_for(document_id=document_id, wait=wait)
         except asyncio.TimeoutError:
-            raise APITimeoutError(document_id=document_id) from None
+            raise APITimeoutError(
+                base_url=self.base_url,
+                timeout=session_timeout.total if session_timeout else None,
+            ) from None
         except Exception as e:
-            try:
-                error_content = await response.json()
-            except Exception:
-                error_content = await response.text()
-            raise APIError(response.status, error_content) from e
+            raise APIError(message=str(e), base_url=self.base_url) from e
 
     async def extract_url(
         self,
@@ -253,7 +269,10 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(response.status, error_content)
+                        raise APIError(
+                            message=error_content,
+                            status_code=response.status,
+                        )
 
             if wait == 0:
                 return extract_response
@@ -266,13 +285,15 @@ class AsyncAurelioClient:
             # Wait for the document to complete processing
             return await self.wait_for(document_id=document_id, wait=wait)
         except asyncio.TimeoutError:
-            raise APITimeoutError(document_id=document_id) from None
+            raise APITimeoutError(
+                base_url=self.base_url,
+                timeout=session_timeout.total if session_timeout else None,
+            ) from None
         except Exception as e:
-            try:
-                error_content = await response.json()
-            except Exception:
-                error_content = await response.text()
-            raise APIError(response.status, error_content) from e
+            raise APIError(
+                message=str(e),
+                base_url=self.base_url,
+            ) from e
 
     async def get_document(
         self, document_id: str, timeout: int = 30
@@ -301,9 +322,15 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(response.status, error_content)
+                        raise APIError(
+                            message=error_content,
+                            status_code=response.status,
+                        )
             except aiohttp.ConnectionTimeoutError as e:
-                raise APITimeoutError(document_id=document_id) from e
+                raise APITimeoutError(
+                    base_url=self.base_url,
+                    timeout=session_timeout.total if session_timeout else None,
+                ) from e
 
     async def wait_for(self, document_id: str, wait: int = 300) -> ExtractResponse:
         """
@@ -369,15 +396,26 @@ class AsyncAurelioClient:
         data = {"input": input, "model": model}
 
         session_timeout = aiohttp.ClientTimeout(total=timeout)
-        async with aiohttp.ClientSession(timeout=session_timeout) as session:
-            async with session.post(
-                client_url, json=data, headers=self.headers
-            ) as response:
-                if response.status == 200:
-                    return EmbeddingResponse(**await response.json())
-                else:
-                    try:
-                        error_content = await response.json()
-                    except Exception:
-                        error_content = await response.text()
-                    raise APIError(response.status, error_content)
+        try:
+            async with aiohttp.ClientSession(timeout=session_timeout) as session:
+                async with session.post(
+                    client_url, json=data, headers=self.headers
+                ) as response:
+                    if response.status == 200:
+                        return EmbeddingResponse(**await response.json())
+                    else:
+                        try:
+                            error_content = await response.json()
+                        except Exception:
+                            error_content = await response.text()
+                        raise APIError(
+                            message=error_content,
+                            status_code=response.status,
+                        )
+        except asyncio.TimeoutError:
+            raise APITimeoutError(
+                base_url=self.base_url,
+                timeout=session_timeout.total if session_timeout else None,
+            ) from None
+        except Exception as e:
+            raise APIError(message=str(e), base_url=self.base_url) from e
