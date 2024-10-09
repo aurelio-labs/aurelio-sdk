@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aurelio-sdk"
-version = "0.0.9"
+version = "0.0.10"
 description = "Aurelio Platform SDK"
 authors = ["Team <hello@aurelio.ai>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ packages = [{ include = "aurelio_sdk" }]
 
 [project]
 name = "aurelio-sdk"
-version = "0.0.9"
+version = "0.0.10"
 license = { file = "LICENSE" }
 
 [tool.poetry.dependencies]
@@ -21,7 +21,6 @@ colorlog = "^6.8.2"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.7"
-black = { extras = ["jupyter"], version = "^24.8.0" }
 types-requests = "^2.32.0.20240914"
 datasets = "^3.0.0"
 mypy = "^1.11.2"
