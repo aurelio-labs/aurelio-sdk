@@ -1,3 +1,4 @@
+import json
 from typing import Optional, Union
 
 
@@ -13,7 +14,9 @@ class APIError(Exception):
         document_id: Optional[str] = None,
         base_url: Optional[str] = None,
     ):
-        # Avoid duplicating the error message
+        if isinstance(message, dict):
+            message = json.dumps(message)
+
         if message.startswith("[AurelioSDK] API request failed"):
             full_message = message
         else:
@@ -43,3 +46,11 @@ class APITimeoutError(TimeoutError):
         if base_url:
             message += f" Base URL: {base_url}"
         super().__init__(message)
+
+
+class FileNotFoundError(Exception):
+    """
+    Exception for file not found errors.
+    """
+
+    pass
