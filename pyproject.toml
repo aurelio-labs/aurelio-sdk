@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aurelio-sdk"
-version = "0.0.11"
+version = "0.0.12"
 description = "Aurelio Platform SDK"
 authors = ["Team <hello@aurelio.ai>"]
 readme = "README.md"
