@@ -2146,6 +2146,17 @@ docs = ["myst-parser", "pydata-sphinx-theme", "sphinx"]
 test = ["argcomplete (>=3.0.3)", "mypy (>=1.7.0)", "pre-commit", "pytest (>=7.0,<8.2)", "pytest-mock", "pytest-mypy-testing"]
 
 [[package]]
+name = "types-aiofiles"
+version = "24.1.0.20240626"
+description = "Typing stubs for aiofiles"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "types-aiofiles-24.1.0.20240626.tar.gz", hash = "sha256:48604663e24bc2d5038eac05ccc33e75799b0779e93e13d6a8f711ddc306ac08"},
+    {file = "types_aiofiles-24.1.0.20240626-py3-none-any.whl", hash = "sha256:7939eca4a8b4f9c6491b6e8ef160caee9a21d32e18534a57d5ed90aee47c66b4"},
+]
+
+[[package]]
 name = "types-requests"
 version = "2.32.0.20241016"
 description = "Typing stubs for requests"
@@ -2459,4 +2470,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9, <4.0"
-content-hash = "9c1bac2ec921c132022a198999755562a1cee960b89cf3a979fc71866c09547b"
+content-hash = "c1f0b352be0794ef1254bfbd4eaeaee765a80cbac4d4326bc6203e5a615ed12d"

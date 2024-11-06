@@ -27,6 +27,7 @@ datasets = "^3.0.0"
 mypy = "^1.11.2"
 ipykernel = "^6.29.5"
 aiofiles = "^24.1.0"
+types-aiofiles = "^24.1.0.20240626"
 
 [build-system]
 requires = ["poetry-core"]
