@@ -69,7 +69,8 @@ class AsyncAurelioClient:
             self.base_url = base_url
 
         self.api_key = api_key or os.environ.get("AURELIO_API_KEY", "")
-        if not self.api_key:
+
+        if not self.api_key or not self.api_key.strip():
             raise ValueError(
                 "API key must be provided either as an argument or "
                 "set as AURELIO_API_KEY environment variable."
