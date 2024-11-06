@@ -78,7 +78,7 @@ file_path = "path/to/your/file.pdf"
 
 with open(file_path, "rb") as file:
     response_pdf_file: ExtractResponse = client.extract_file(
-        file=file, quality="low", chunk=True, wait=-1, enable_polling=True
+        file=file, quality="low", chunk=True, wait=-1
     )
 ```
 
@@ -92,7 +92,7 @@ file_path = "path/to/your/file.mp4"
 
 with open(file_path, "rb") as file:
     response_video_file: ExtractResponse = client.extract_file(
-        file=file, quality="low", chunk=True, wait=-1, enable_polling=True
+        file=file, quality="low", chunk=True, wait=-1
     )
 ```
 
@@ -106,7 +106,7 @@ from aurelio_sdk import ExtractResponse
 # From URL
 url = "https://arxiv.org/pdf/2408.15291"
 response_pdf_url: ExtractResponse = client.extract_url(
-    url=url, quality="low", chunk=True, wait=-1, enable_polling=True
+    url=url, quality="low", chunk=True, wait=-1
 )
 ```
 
@@ -118,7 +118,7 @@ from aurelio_sdk import ExtractResponse
 # From URL
 url = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
 response_video_url: ExtractResponse = client.extract_url(
-    url=url, quality="low", chunk=True, wait=-1, enable_polling=True
+    url=url, quality="low", chunk=True, wait=-1
 )
 ```
 

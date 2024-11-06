@@ -14,7 +14,10 @@ class CustomLogger(logging.Logger):
 class CustomFormatter(colorlog.ColoredFormatter):
     def __init__(self):
         super().__init__(
-            "%(log_color)s[%(levelname)s] [AurelioSDK] -- %(asctime)s - %(filename)s:%(lineno)d|%(funcName)s(): %(message)s",
+            fmt=(
+                "%(log_color)s[AurelioSDK] [%(levelname)s] -- %(asctime)s - "
+                "at %(filename)s:%(lineno)d in %(funcName)s(): %(message)s"
+            ),
             datefmt="%Y-%m-%d %H:%M:%S",
             log_colors={
                 "DEBUG": "cyan",
