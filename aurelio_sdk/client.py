@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import logging
 import os
+import pathlib
 import time
 from typing import IO, Annotated, List, Literal, Optional, Union
 
 import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from aurelio_sdk.const import POLLING_INTERVAL, WAIT_TIME_BEFORE_POLLING
 from aurelio_sdk.exceptions import APIError, APITimeoutError
@@ -111,11 +115,12 @@ class AurelioClient:
 
     def extract_file(
         self,
-        file: Union[IO[bytes], bytes],
-        quality: Literal["low", "high"],
-        chunk: bool,
+        file: Optional[Union[IO[bytes], bytes]] = None,
+        file_path: Optional[str] = None,
+        quality: Literal["low", "high"] = "low",
+        chunk: bool = True,
         wait: int = 30,
-        enable_polling: bool = True,
+        polling_interval: int = POLLING_INTERVAL,
     ) -> ExtractResponse:
         """Process a document from a file asynchronously.
 
@@ -126,9 +131,8 @@ class AurelioClient:
             wait (int): Time to wait for document completion in seconds. Default is 30.
                 If set to -1, waits until completion. If the wait time is exceeded,
                 returns the document ID with a "pending" status.
-            enable_polling (bool): If False, disables polling for document completion.
-                Instead, maintains a continuous connection to the API until the
-                document is completed. Default is True (polling is enabled).
+            polling_interval (int): Time between polling requests in seconds.
+                Default is 5s, if polling_interval is 0, polling is disabled.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -138,20 +142,29 @@ class AurelioClient:
             APITimeoutError: If the request times out.
             APIError: If there's an error in the API response.
         """
+        if not (file_path or file):
+            raise ValueError("Either file_path or file must be provided")
+
         client_url = f"{self.base_url}/v1/extract/file"
 
-        filename = getattr(file, "name", "document.pdf")
-
-        files = {"file": (filename, file)}
-        data = {
-            "quality": quality,
-            "chunk": chunk,
-            "wait": wait,
+        fields = {
+            "quality": str(quality),
+            "chunk": str(chunk).lower(),
+            "wait": str(wait),
         }
+        initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
+        fields["wait"] = str(initial_wait)
 
-        # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
-        if enable_polling:
-            data["wait"] = WAIT_TIME_BEFORE_POLLING
+        if file_path:
+            filename = pathlib.Path(file_path).name
+            multipart_encoder = MultipartEncoder(
+                fields={**fields, "file": (filename, open(file_path, "rb"))}
+            )
+        else:
+            filename = getattr(file, "name", "document.pdf")
+            multipart_encoder = MultipartEncoder(
+                fields={**fields, "file": (filename, file)}
+            )
 
         document_id = None
         response = None
@@ -159,9 +172,11 @@ class AurelioClient:
             session_timeout = wait + 1 if wait > 0 else None
             response = requests.post(
                 client_url,
-                files=files,
-                data=data,
-                headers=self.headers,
+                data=multipart_encoder,
+                headers={
+                    **self.headers,
+                    "Content-Type": multipart_encoder.content_type,
+                },
                 timeout=session_timeout,
             )
 
@@ -184,11 +199,16 @@ class AurelioClient:
 
             # If the document is already processed or polling is disabled,
             # return the response
-            if extract_response.status in ["completed", "failed"] or not enable_polling:
+            if (
+                extract_response.status in ["completed", "failed"]
+                or polling_interval <= 0
+            ):
                 return extract_response
 
             # Wait for the document to complete processing
-            return self.wait_for(document_id=document_id, wait=wait)
+            return self.wait_for(
+                document_id=document_id, wait=wait, polling_interval=polling_interval
+            )
         except requests.exceptions.Timeout:
             raise APITimeoutError(
                 timeout=session_timeout, base_url=self.base_url
@@ -202,7 +222,7 @@ class AurelioClient:
         quality: Literal["low", "high"],
         chunk: bool,
         wait: int = 30,
-        enable_polling: bool = True,
+        polling_interval: int = POLLING_INTERVAL,
     ) -> ExtractResponse:
         """Process a document from a URL synchronously.
 
@@ -234,8 +254,8 @@ class AurelioClient:
         }
 
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
-        if enable_polling:
-            data["wait"] = WAIT_TIME_BEFORE_POLLING
+        initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
+        data["wait"] = initial_wait
 
         document_id = None
         response = None
@@ -264,11 +284,16 @@ class AurelioClient:
 
             # If the document is already processed or polling is disabled,
             # return the response
-            if extract_response.status in ["completed", "failed"] or not enable_polling:
+            if (
+                extract_response.status in ["completed", "failed"]
+                or polling_interval <= 0
+            ):
                 return extract_response
 
             # Wait for the document to complete processing
-            return self.wait_for(document_id=document_id, wait=wait)
+            return self.wait_for(
+                document_id=document_id, wait=wait, polling_interval=polling_interval
+            )
         except requests.exceptions.Timeout:
             raise APITimeoutError(
                 timeout=session_timeout, base_url=self.base_url
@@ -309,7 +334,12 @@ class AurelioClient:
         except Exception as e:
             raise APIError(message=str(e), base_url=self.base_url) from e
 
-    def wait_for(self, document_id: str, wait: int = 300) -> ExtractResponse:
+    def wait_for(
+        self,
+        document_id: str,
+        wait: int = 300,
+        polling_interval: int = POLLING_INTERVAL,
+    ) -> ExtractResponse:
         """
         Waits for the document to reach 'completed' or 'failed' status or until timeout.
 
@@ -331,7 +361,7 @@ class AurelioClient:
         end_time = start_time + wait if wait >= 0 else float("inf")
 
         while document_response.status not in FINAL_STATES and not timeout_reached:
-            time.sleep(POLLING_INTERVAL)
+            time.sleep(polling_interval)
 
             # Check for timeout
             if time.time() > end_time:

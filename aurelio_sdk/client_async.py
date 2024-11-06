@@ -153,7 +153,7 @@ class AsyncAurelioClient:
                 If set to -1, waits until completion. If the wait time is exceeded,
                 returns the document ID with a "pending" status.
             polling_interval (int): Time between polling requests in seconds.
-                Default is 15s, if polling_interval is 0, polling is disabled.
+                Default is 5s, if polling_interval is 0, polling is disabled.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -232,7 +232,7 @@ class AsyncAurelioClient:
             # return the response
             if (
                 extract_response.status in ["completed", "failed"]
-                or polling_interval == 0
+                or polling_interval <= 0
             ):
                 return extract_response
 
