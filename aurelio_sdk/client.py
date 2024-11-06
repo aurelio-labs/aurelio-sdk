@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import logging
 import os
+import pathlib
 import time
 from typing import IO, Annotated, List, Literal, Optional, Union
 
 import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from aurelio_sdk.const import POLLING_INTERVAL, WAIT_TIME_BEFORE_POLLING
 from aurelio_sdk.exceptions import APIError, APITimeoutError
@@ -111,9 +115,10 @@ class AurelioClient:
 
     def extract_file(
         self,
-        file: Union[IO[bytes], bytes],
-        quality: Literal["low", "high"],
-        chunk: bool,
+        file: Optional[Union[IO[bytes], bytes]] = None,
+        file_path: Optional[str] = None,
+        quality: Literal["low", "high"] = "low",
+        chunk: bool = True,
         wait: int = 30,
         enable_polling: bool = True,
     ) -> ExtractResponse:
@@ -138,20 +143,30 @@ class AurelioClient:
             APITimeoutError: If the request times out.
             APIError: If there's an error in the API response.
         """
+        if not (file_path or file):
+            raise ValueError("Either file_path or file must be provided")
+
         client_url = f"{self.base_url}/v1/extract/file"
 
-        filename = getattr(file, "name", "document.pdf")
-
-        files = {"file": (filename, file)}
-        data = {
-            "quality": quality,
-            "chunk": chunk,
-            "wait": wait,
+        fields = {
+            "quality": str(quality),
+            "chunk": str(chunk).lower(),
+            "wait": str(wait),
         }
+        if file_path:
+            filename = pathlib.Path(file_path).name
+            multipart_encoder = MultipartEncoder(
+                fields={**fields, "file": (filename, open(file_path, "rb"))}
+            )
+        else:
+            filename = getattr(file, "name", "document.pdf")
+            multipart_encoder = MultipartEncoder(
+                fields={**fields, "file": (filename, file)}
+            )
 
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
         if enable_polling:
-            data["wait"] = WAIT_TIME_BEFORE_POLLING
+            fields["wait"] = str(WAIT_TIME_BEFORE_POLLING)
 
         document_id = None
         response = None
@@ -159,9 +174,11 @@ class AurelioClient:
             session_timeout = wait + 1 if wait > 0 else None
             response = requests.post(
                 client_url,
-                files=files,
-                data=data,
-                headers=self.headers,
+                data=multipart_encoder,
+                headers={
+                    **self.headers,
+                    "Content-Type": multipart_encoder.content_type,
+                },
                 timeout=session_timeout,
             )
 

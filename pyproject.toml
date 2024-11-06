@@ -41,9 +41,14 @@ select = [
     "I",  # isort
 ]
 # Never enforce `E501` (line length violations).
-ignore = ["E501"]
+
+ignore = ["E501", "UP007", "UP006", "UP035"]
 fixable = ["ALL"]
 exclude = ["*.ipynb"]
+
+[tool.ruff]
+target-version = "py39"
+
 
 [tool.ruff.format]
 quote-style = "double"
