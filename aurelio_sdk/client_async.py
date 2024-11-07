@@ -15,7 +15,7 @@ from aurelio_sdk.const import (
     UPLOAD_CHUNK_SIZE,
     WAIT_TIME_BEFORE_POLLING,
 )
-from aurelio_sdk.exceptions import APIError, APITimeoutError
+from aurelio_sdk.exceptions import ApiError, ApiTimeoutError
 from aurelio_sdk.logger import logger
 from aurelio_sdk.schema import (
     ChunkingOptions,
@@ -120,24 +120,24 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(
+                        raise ApiError(
                             message=error_content,
                             status_code=response.status,
                         )
         except asyncio.TimeoutError:
-            raise APITimeoutError(
+            raise ApiTimeoutError(
                 timeout=timeout,
                 base_url=self.base_url,
             ) from None
         except Exception as e:
-            raise APIError(message=str(e), base_url=self.base_url) from e
+            raise ApiError(message=str(e), base_url=self.base_url) from e
 
     async def extract_file(
         self,
         quality: Literal["low", "high"],
         chunk: bool,
         file: Optional[Union[IO[bytes], bytes]] = None,
-        file_path: Optional[str] = None,
+        file_path: Optional[Union[str, Path]] = None,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
     ) -> ExtractResponse:
@@ -169,6 +169,13 @@ class AsyncAurelioClient:
 
         client_url = f"{self.base_url}/v1/extract/file"
 
+        # Form data
+        data = aiohttp.FormData()
+        data.add_field("quality", quality)
+        data.add_field("chunk", str(chunk))
+        initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
+        data.add_field("wait", str(initial_wait))
+
         # Handle file from path, convert to AsyncGenerator
         if file_path:
             logger.debug(f"Uploading file from path, {file_path}")
@@ -176,30 +183,19 @@ class AsyncAurelioClient:
                 raise FileNotFoundError(f"File not found: {file_path}")
             file_stream = _file_stream_generator(file_path)
             filename = Path(file_path).name
-        else:
-            filename = None
 
-        # Add file field
-        data = aiohttp.FormData()
-        if file_stream:
-            logger.debug("Uploading using stream")
             # Wrap the AsyncGenerator with an AsyncIterablePayload
             file_payload = aiohttp.payload.AsyncIterablePayload(value=file_stream)
+            file_payload.content_type
             data.add_field(
                 name="file",
                 value=file_payload,
                 filename=filename,
-                content_type="application/octet-stream",
+                content_type=file_payload.content_type,
             )
         else:
             logger.debug("Uploading file bytes")
-            data.add_field("file", file, filename=filename)
-
-        # Add other fields
-        data.add_field("quality", quality)
-        data.add_field("chunk", str(chunk))
-        initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
-        data.add_field("wait", str(initial_wait))
+            data.add_field("file", file)
 
         if wait <= 0:
             session_timeout = None
@@ -242,12 +238,12 @@ class AsyncAurelioClient:
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
         except asyncio.TimeoutError:
-            raise APITimeoutError(
+            raise ApiTimeoutError(
                 base_url=self.base_url,
                 timeout=session_timeout.total if session_timeout else None,
             ) from None
         except Exception as e:
-            raise APIError(
+            raise ApiError(
                 message=str(e), base_url=self.base_url, status_code=status_code
             ) from e
 
@@ -312,7 +308,7 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(
+                        raise ApiError(
                             message=error_content,
                             status_code=response.status,
                         )
@@ -333,12 +329,12 @@ class AsyncAurelioClient:
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
         except asyncio.TimeoutError:
-            raise APITimeoutError(
+            raise ApiTimeoutError(
                 base_url=self.base_url,
                 timeout=session_timeout.total if session_timeout else None,
             ) from None
         except Exception as e:
-            raise APIError(
+            raise ApiError(
                 message=str(e),
                 base_url=self.base_url,
             ) from e
@@ -370,12 +366,12 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(
+                        raise ApiError(
                             message=error_content,
                             status_code=response.status,
                         )
             except aiohttp.ConnectionTimeoutError as e:
-                raise APITimeoutError(
+                raise ApiTimeoutError(
                     base_url=self.base_url,
                     timeout=session_timeout.total if session_timeout else None,
                 ) from e
@@ -461,17 +457,17 @@ class AsyncAurelioClient:
                             error_content = await response.json()
                         except Exception:
                             error_content = await response.text()
-                        raise APIError(
+                        raise ApiError(
                             message=error_content,
                             status_code=response.status,
                         )
         except asyncio.TimeoutError:
-            raise APITimeoutError(
+            raise ApiTimeoutError(
                 base_url=self.base_url,
                 timeout=session_timeout.total if session_timeout else None,
             ) from None
         except Exception as e:
-            raise APIError(message=str(e), base_url=self.base_url) from e
+            raise ApiError(message=str(e), base_url=self.base_url) from e
 
 
 async def _file_stream_generator(

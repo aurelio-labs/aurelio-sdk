@@ -10,7 +10,7 @@ import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from aurelio_sdk.const import POLLING_INTERVAL, WAIT_TIME_BEFORE_POLLING
-from aurelio_sdk.exceptions import APIError, APITimeoutError
+from aurelio_sdk.exceptions import ApiError, ApiTimeoutError
 from aurelio_sdk.logger import logger
 from aurelio_sdk.schema import (
     ChunkingOptions,
@@ -105,18 +105,18 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(
+                raise ApiError(
                     message=error_content,
                     status_code=response.status_code,
                     base_url=self.base_url,
                 )
         except Exception as e:
-            raise APIError(message=str(e), base_url=self.base_url) from e
+            raise ApiError(message=str(e), base_url=self.base_url) from e
 
     def extract_file(
         self,
         file: Optional[Union[IO[bytes], bytes]] = None,
-        file_path: Optional[str] = None,
+        file_path: Optional[Union[str, pathlib.Path]] = None,
         quality: Literal["low", "high"] = "low",
         chunk: bool = True,
         wait: int = 30,
@@ -188,7 +188,7 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(
+                raise ApiError(
                     message=error_content,
                     status_code=response.status_code,
                     base_url=self.base_url,
@@ -210,11 +210,11 @@ class AurelioClient:
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
         except requests.exceptions.Timeout:
-            raise APITimeoutError(
+            raise ApiTimeoutError(
                 timeout=session_timeout, base_url=self.base_url
             ) from None
         except Exception as e:
-            raise APIError(message=str(e), base_url=self.base_url) from e
+            raise ApiError(message=str(e), base_url=self.base_url) from e
 
     def extract_url(
         self,
@@ -273,7 +273,7 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(
+                raise ApiError(
                     message=error_content,
                     status_code=response.status_code,
                     base_url=self.base_url,
@@ -295,11 +295,11 @@ class AurelioClient:
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
         except requests.exceptions.Timeout:
-            raise APITimeoutError(
+            raise ApiTimeoutError(
                 timeout=session_timeout, base_url=self.base_url
             ) from None
         except Exception as e:
-            raise APIError(
+            raise ApiError(
                 message=str(e),
                 base_url=self.base_url,
             ) from e
@@ -324,15 +324,15 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(
+                raise ApiError(
                     message=error_content,
                     status_code=response.status_code,
                     base_url=self.base_url,
                 )
         except requests.exceptions.Timeout:
-            raise APITimeoutError(timeout=timeout, base_url=self.base_url) from None
+            raise ApiTimeoutError(timeout=timeout, base_url=self.base_url) from None
         except Exception as e:
-            raise APIError(message=str(e), base_url=self.base_url) from e
+            raise ApiError(message=str(e), base_url=self.base_url) from e
 
     def wait_for(
         self,
@@ -412,15 +412,15 @@ class AurelioClient:
                     error_content = response.json()
                 except Exception:
                     error_content = response.text
-                raise APIError(
+                raise ApiError(
                     message=error_content,
                     status_code=response.status_code,
                     base_url=self.base_url,
                 )
         except requests.exceptions.Timeout:
-            raise APITimeoutError(timeout=timeout, base_url=self.base_url) from None
+            raise ApiTimeoutError(timeout=timeout, base_url=self.base_url) from None
         except Exception as e:
-            raise APIError(
+            raise ApiError(
                 message=str(e),
                 base_url=self.base_url,
             ) from e

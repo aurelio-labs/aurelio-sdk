@@ -2,7 +2,7 @@ import json
 from typing import Optional, Union
 
 
-class APIError(Exception):
+class ApiError(Exception):
     """
     Exception for API errors.
     """
@@ -30,7 +30,7 @@ class APIError(Exception):
         super().__init__(full_message)
 
 
-class APITimeoutError(TimeoutError):
+class ApiTimeoutError(TimeoutError):
     """
     Exception for timeout errors.
     """
@@ -47,10 +47,3 @@ class APITimeoutError(TimeoutError):
             message += f" Base URL: {base_url}"
         super().__init__(message)
 
-
-class FileNotFoundError(Exception):
-    """
-    Exception for file not found errors.
-    """
-
-    pass
