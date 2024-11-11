@@ -10,7 +10,7 @@ import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from aurelio_sdk.const import POLLING_INTERVAL, WAIT_TIME_BEFORE_POLLING
-from aurelio_sdk.exceptions import ApiError, ApiTimeoutError
+from aurelio_sdk.exceptions import ApiError, ApiRateLimitError, ApiTimeoutError
 from aurelio_sdk.logger import logger
 from aurelio_sdk.schema import (
     ChunkingOptions,
@@ -87,6 +87,7 @@ class AurelioClient:
 
         Raises:
             AurelioAPIError: If the API request fails.
+            ApiRateLimitError: If the rate limit is exceeded.
         """
         client_url = f"{self.base_url}/v1/chunk"
 
@@ -100,6 +101,11 @@ class AurelioClient:
             )
             if response.status_code == 200:
                 return ChunkResponse(**response.json())
+            elif response.status_code == 429:
+                raise ApiRateLimitError(
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
             else:
                 try:
                     error_content = response.json()
@@ -110,6 +116,8 @@ class AurelioClient:
                     status_code=response.status_code,
                     base_url=self.base_url,
                 )
+        except ApiRateLimitError as e:
+            raise e
         except Exception as e:
             raise ApiError(message=str(e), base_url=self.base_url) from e
 
@@ -141,6 +149,7 @@ class AurelioClient:
         Raises:
             APITimeoutError: If the request times out.
             APIError: If there's an error in the API response.
+            ApiRateLimitError: If the rate limit is exceeded.
         """
         if not (file_path or file):
             raise ValueError("Either file_path or file must be provided")
@@ -183,6 +192,11 @@ class AurelioClient:
             if response.status_code == 200:
                 extract_response = ExtractResponse(**response.json())
                 document_id = extract_response.document.id
+            elif response.status_code == 429:
+                raise ApiRateLimitError(
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
             else:
                 try:
                     error_content = response.json()
@@ -209,6 +223,8 @@ class AurelioClient:
             return self.wait_for(
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
+        except ApiRateLimitError as e:
+            raise e
         except requests.exceptions.Timeout:
             raise ApiTimeoutError(
                 timeout=session_timeout, base_url=self.base_url
@@ -244,6 +260,7 @@ class AurelioClient:
         Raises:
             APITimeoutError: If the request times out.
             APIError: If there's an error in the API response.
+            ApiRateLimitError: If the rate limit is exceeded.
         """
         client_url = f"{self.base_url}/v1/extract/url"
         data = {
@@ -268,6 +285,11 @@ class AurelioClient:
             if response.status_code == 200:
                 extract_response = ExtractResponse(**response.json())
                 document_id = extract_response.document.id
+            elif response.status_code == 429:
+                raise ApiRateLimitError(
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
             else:
                 try:
                     error_content = response.json()
@@ -294,6 +316,8 @@ class AurelioClient:
             return self.wait_for(
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
+        except ApiRateLimitError as e:
+            raise e
         except requests.exceptions.Timeout:
             raise ApiTimeoutError(
                 timeout=session_timeout, base_url=self.base_url
@@ -319,6 +343,11 @@ class AurelioClient:
             response = requests.get(client_url, headers=self.headers, timeout=timeout)
             if response.status_code == 200:
                 return ExtractResponse(**response.json())
+            elif response.status_code == 429:
+                raise ApiRateLimitError(
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
             else:
                 try:
                     error_content = response.json()
@@ -329,6 +358,8 @@ class AurelioClient:
                     status_code=response.status_code,
                     base_url=self.base_url,
                 )
+        except ApiRateLimitError as e:
+            raise e
         except requests.exceptions.Timeout:
             raise ApiTimeoutError(timeout=timeout, base_url=self.base_url) from None
         except Exception as e:
@@ -398,6 +429,7 @@ class AurelioClient:
         Raises:
             APIError: If the API request fails.
             APITimeoutError: If the request exceeds the specified timeout.
+            ApiRateLimitError: If the rate limit is exceeded.
         """
         client_url = f"{self.base_url}/v1/embeddings"
         data = {"input": input, "model": model}
@@ -407,6 +439,11 @@ class AurelioClient:
             )
             if response.status_code == 200:
                 return EmbeddingResponse(**response.json())
+            elif response.status_code == 429:
+                raise ApiRateLimitError(
+                    status_code=response.status_code,
+                    base_url=self.base_url,
+                )
             else:
                 try:
                     error_content = response.json()
@@ -417,6 +454,8 @@ class AurelioClient:
                     status_code=response.status_code,
                     base_url=self.base_url,
                 )
+        except ApiRateLimitError as e:
+            raise e
         except requests.exceptions.Timeout:
             raise ApiTimeoutError(timeout=timeout, base_url=self.base_url) from None
         except Exception as e:

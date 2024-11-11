@@ -48,3 +48,28 @@ class ApiTimeoutError(TimeoutError):
         super().__init__(message)
 
 
+class ApiRateLimitError(Exception):
+    """
+    Exception for rate limit errors.
+    """
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        status_code: Optional[int] = None,
+        document_id: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        if isinstance(message, dict):
+            message = json.dumps(message)
+
+        full_message = "[AurelioSDK] API rate limit exceeded."
+        if message:
+            full_message += f" {message}."
+        if document_id:
+            full_message += f" Document ID: {document_id}."
+        if status_code:
+            full_message += f" Status code: {status_code}."
+        if base_url:
+            full_message += f" Base API URL: {base_url}."
+        super().__init__(full_message)

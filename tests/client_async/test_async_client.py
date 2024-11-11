@@ -1,11 +1,13 @@
 # Tests for AsyncAurelioClient
+import asyncio
 import os
+from pathlib import Path
 
 import pytest
 from dotenv import load_dotenv
 
 from aurelio_sdk.client_async import AsyncAurelioClient
-from aurelio_sdk.exceptions import ApiError
+from aurelio_sdk.exceptions import ApiError, ApiRateLimitError
 from aurelio_sdk.schema import ChunkingOptions
 
 load_dotenv()
@@ -52,9 +54,52 @@ async def test_async_client_unauthorized():
     with pytest.raises(ApiError):
         await client.chunk(content="test", processing_options=ChunkingOptions())
 
+
 @pytest.mark.asyncio
 async def test_async_client_empty_base_url():
     client = AsyncAurelioClient(api_key="test_api_key", base_url="")
     assert client.api_key == "test_api_key"
     assert client.base_url == "https://api.aurelio.ai"
 
+
+@pytest.mark.asyncio
+async def test_async_client_rate_limit_error(client: AsyncAurelioClient):
+    with pytest.raises(ApiRateLimitError):
+        client = AsyncAurelioClient(
+            api_key=os.environ["AURELIO_API_KEY_PRODUCTION"],
+            base_url=os.environ["BASE_URL_PRODUCTION"],
+        )
+
+        file_path = Path(__file__).parent.parent / "data" / "test_pdf.pdf"
+        tasks: set[asyncio.Task] = set()
+        for _ in range(30):
+            tasks.add(
+                asyncio.create_task(
+                    client.extract_file(
+                        file_path=file_path,
+                        quality="low",
+                        chunk=False,
+                        wait=-1,
+                        polling_interval=2,
+                    )
+                )
+            )
+        try:
+            done, pending = await asyncio.wait(
+                tasks, return_when=asyncio.FIRST_EXCEPTION
+            )
+            for task in done:
+                exception = task.exception()
+                if isinstance(exception, ApiRateLimitError):
+                    tasks.remove(task)
+                    raise exception  # Re-raise to be caught by pytest.raises
+                elif exception:
+                    tasks.remove(task)
+                    raise exception
+                else:
+                    tasks.remove(task)
+        finally:
+            for task in pending:
+                task.cancel()
+            # Await canceled tasks to suppress CancelledError
+            await asyncio.gather(*pending, return_exceptions=True)
