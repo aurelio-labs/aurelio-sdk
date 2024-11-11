@@ -51,3 +51,10 @@ async def test_async_client_unauthorized():
     assert client.base_url == "https://api.aurelio.ai"
     with pytest.raises(ApiError):
         await client.chunk(content="test", processing_options=ChunkingOptions())
+
+@pytest.mark.asyncio
+async def test_async_client_empty_base_url():
+    client = AsyncAurelioClient(api_key="test_api_key", base_url="")
+    assert client.api_key == "test_api_key"
+    assert client.base_url == "https://api.aurelio.ai"
+

@@ -11,4 +11,4 @@ lint lint_diff:
 
 
 test:
-	poetry run pytest -s -vvv tests/
+	poetry run pytest --cov=aurelio_sdk -n auto -s -vvv tests/

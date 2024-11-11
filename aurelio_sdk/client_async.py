@@ -281,8 +281,9 @@ class AsyncAurelioClient:
         data.add_field("quality", quality)
         data.add_field("chunk", str(chunk))
 
-        # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)
-        # If polling is disabled, use the full wait time
+        # If polling is enabled (polling_interval > 0), use a short wait time
+        # (WAIT_TIME_BEFORE_POLLING)
+        # If polling is disabled (polling_interval <= 0), use the full wait time
         initial_request_timeout = (
             WAIT_TIME_BEFORE_POLLING if polling_interval < 0 else wait
         )
@@ -328,7 +329,10 @@ class AsyncAurelioClient:
             return await self.wait_for(
                 document_id=document_id, wait=wait, polling_interval=polling_interval
             )
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError as e:
+            logger.error(
+                f"Timeout error: {e}, timeout: {session_timeout.total if session_timeout else None}"
+            )
             raise ApiTimeoutError(
                 base_url=self.base_url,
                 timeout=session_timeout.total if session_timeout else None,
@@ -371,6 +375,9 @@ class AsyncAurelioClient:
                             status_code=response.status,
                         )
             except aiohttp.ConnectionTimeoutError as e:
+                logger.error(
+                    f"Connection timeout: {e}, timeout: {session_timeout.total if session_timeout else None}"
+                )
                 raise ApiTimeoutError(
                     base_url=self.base_url,
                     timeout=session_timeout.total if session_timeout else None,

@@ -22,11 +22,11 @@ class ApiError(Exception):
         else:
             full_message = f"[AurelioSDK] API request failed: {message}."
         if document_id:
-            full_message += f" Document ID: {document_id}"
+            full_message += f" Document ID: {document_id}."
         if status_code:
-            full_message += f" Status code: {status_code}"
+            full_message += f" Status code: {status_code}."
         if base_url:
-            full_message += f" Base URL: {base_url}"
+            full_message += f" Base API URL: {base_url}."
         super().__init__(full_message)
 
 
@@ -46,4 +46,5 @@ class ApiTimeoutError(TimeoutError):
         if base_url:
             message += f" Base URL: {base_url}"
         super().__init__(message)
+
 
