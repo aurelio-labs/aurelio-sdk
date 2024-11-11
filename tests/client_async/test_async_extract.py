@@ -112,11 +112,11 @@ async def test_extract_pdf_file_from_bytes(client: AsyncAurelioClient):
     with open(file_path, "rb") as f:
         file_bytes = f.read()
 
-    file_bytes = io.BytesIO(file_bytes)
-    file_bytes.name = "test_pdf.pdf"
+    file_bytes_io = io.BytesIO(file_bytes)
+    file_bytes_io.name = "test_pdf.pdf"
 
     response: ExtractResponse = await client.extract_file(
-        file=file_bytes, quality="low", chunk=False, wait=-1, polling_interval=2
+        file=file_bytes_io, quality="low", chunk=False, wait=-1, polling_interval=2
     )
 
     dict_response = response.model_dump()
@@ -171,7 +171,7 @@ async def test_extract_video_file_from_file_path(client: AsyncAurelioClient):
     )
     assert max_num_tokens <= 500
     assert dict_response["document"]["chunks"][0]["metadata"]["start_time"] == 0
-    assert 95 <dict_response["document"]["chunks"][0]["metadata"]["end_time"] < 110
+    assert 95 < dict_response["document"]["chunks"][0]["metadata"]["end_time"] < 110
 
 
 @pytest.mark.asyncio

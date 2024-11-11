@@ -7,7 +7,6 @@ import pytest
 from dotenv import load_dotenv
 
 from aurelio_sdk.client_async import AsyncAurelioClient
-from aurelio_sdk.exceptions import ApiError
 from aurelio_sdk.schema import ChunkingOptions, ChunkResponse
 
 load_dotenv()
@@ -30,13 +29,18 @@ def content():
     except FileNotFoundError:
         pytest.skip(f"Content file not found at {file_path}")
 
+
 @pytest.mark.asyncio
 async def test_chunk_invalid(client: AsyncAurelioClient, content: str):
     with pytest.raises(pydantic_core._pydantic_core.ValidationError):
         chunking_options = ChunkingOptions(
-            chunker_type="invalid", delimiters=[], max_chunk_length=400
+            # Intentionally invalid chunker_type, and type ignore for mypy
+            chunker_type="invalid",  # type: ignore
+            delimiters=[],
+            max_chunk_length=400,
         )
         await client.chunk(content=content, processing_options=chunking_options)
+
 
 @pytest.mark.asyncio
 async def test_chunk_regex(client: AsyncAurelioClient, content: str):
@@ -82,6 +86,7 @@ async def test_chunk_regex_delimiters(client: AsyncAurelioClient):
     assert len(dict_response["document"]["content"]) == 52
     assert dict_response["document"]["num_chunks"] == 4
 
+
 @pytest.mark.asyncio
 async def test_chunk_semantic(client: AsyncAurelioClient, content: str):
     chunking_options = ChunkingOptions(
@@ -105,5 +110,7 @@ async def test_chunk_semantic(client: AsyncAurelioClient, content: str):
     assert dict_response["document"]["chunks"][0]["id"].startswith("chunk_")
     assert dict_response["document"]["chunks"][0]["chunk_index"] == 1
     assert dict_response["document"]["chunks"][0]["num_tokens"] > 170
-    max_num_tokens = max(chunk["num_tokens"] for chunk in dict_response["document"]["chunks"])
+    max_num_tokens = max(
+        chunk["num_tokens"] for chunk in dict_response["document"]["chunks"]
+    )
     assert max_num_tokens <= 400
