@@ -65,10 +65,12 @@ async def test_async_client_empty_base_url():
 @pytest.mark.asyncio
 async def test_async_client_rate_limit_error(client: AsyncAurelioClient):
     with pytest.raises(ApiRateLimitError):
-        client = AsyncAurelioClient(
-            api_key=os.environ["AURELIO_API_KEY_PRODUCTION"],
-            base_url=os.environ["BASE_URL_PRODUCTION"],
-        )
+        if client.base_url in ["https://api.aurelio.ai", "https://staging.api.aurelio.ai"]:
+            # Rate limits are available only in the cloud environments
+            client = AsyncAurelioClient(
+                api_key=os.environ["AURELIO_API_KEY_PRODUCTION"],
+                base_url=os.environ["BASE_URL_PRODUCTION"],
+            )
 
         file_path = Path(__file__).parent.parent / "data" / "test_pdf.pdf"
         tasks: set[asyncio.Task] = set()
