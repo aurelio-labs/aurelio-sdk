@@ -1,4 +1,5 @@
 import asyncio
+import io
 import logging
 import os
 import time
@@ -221,12 +222,6 @@ class AsyncAurelioClient:
 
         extract_response = None
 
-        # If file is a file-like object, reset its position before retries
-        if hasattr(file, 'seek')
-            initial_file_position = file.tell()
-        else:
-            initial_file_position = None
-
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
             for attempt in range(1, retries + 1):
                 # Form data
@@ -259,10 +254,21 @@ class AsyncAurelioClient:
                     )
                 else:
                     logger.debug("Uploading file bytes")
-                    # Reset file-like object position
-                    if initial_file_position is not None:
-                        file.seek(initial_file_position)
-                    data.add_field("file", file)
+                    try:
+                        if isinstance(file, (bytes, bytearray)):
+                            data.add_field("file", file)
+                        elif isinstance(file, io.IOBase):
+                            # Handle file-like objects
+                            pos = file.tell()
+                            file.seek(0)
+                            file_content = file.read()
+                            data.add_field("file", file_content)
+                            file.seek(pos)
+                    except Exception as e:
+                        raise ApiError(
+                            message=f"Failed to read file contents: {str(e)}",
+                            base_url=self.base_url,
+                        ) from e
 
                 try:
                     async with session.post(
@@ -299,7 +305,7 @@ class AsyncAurelioClient:
                                 status_code=response.status,
                             )
                 except ApiRateLimitError as e:
-                    raise e
+                    raise e from None
                 except asyncio.TimeoutError:
                     if attempt == retries:
                         raise ApiTimeoutError(
@@ -429,7 +435,7 @@ class AsyncAurelioClient:
                                 status_code=response.status,
                             )
                 except ApiRateLimitError as e:
-                    raise e
+                    raise e from None
                 except asyncio.TimeoutError:
                     if attempt == retries:
                         raise ApiTimeoutError(
