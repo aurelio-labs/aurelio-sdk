@@ -86,6 +86,7 @@ class AsyncAurelioClient:
         content: str,
         processing_options: Optional[ChunkingOptions] = None,
         timeout: int = 30,
+        retries: int = 3,
     ) -> ChunkResponse:
         """Chunk a document synchronously.
 
@@ -95,6 +96,7 @@ class AsyncAurelioClient:
             timeout: The timeout to keep open the connection to the client in
                 seconds. Defaults to 30 seconds, None means no timeout.
                 After the timeout, raise a timeout error.
+            retries: Number of times to retry the request in case of failures.
 
         Returns:
             ChunkResponse: Object containing the response from the API.
@@ -109,37 +111,67 @@ class AsyncAurelioClient:
             content=content, processing_options=processing_options
         )
         session_timeout = aiohttp.ClientTimeout(total=timeout)
-        try:
-            async with aiohttp.ClientSession(timeout=session_timeout) as session:
-                async with session.post(
-                    client_url, json=payload.model_dump(), headers=self.headers
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return ChunkResponse(**data)
-                    elif response.status == 429:
-                        raise ApiRateLimitError(
-                            status_code=response.status,
-                            base_url=self.base_url,
-                        )
-                    else:
-                        try:
-                            error_content = await response.json()
-                        except Exception:
+
+        async with aiohttp.ClientSession(timeout=session_timeout) as session:
+            for attempt in range(1, retries + 1):
+                try:
+                    async with session.post(
+                        client_url, json=payload.model_dump(), headers=self.headers
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return ChunkResponse(**data)
+                        elif response.status == 429:
+                            raise ApiRateLimitError(
+                                message="Rate limit exceeded of 100 requests per minute",
+                                status_code=response.status,
+                                base_url=self.base_url,
+                            )
+                        elif response.status >= 500:
+                            # Server error, retry
                             error_content = await response.text()
-                        raise ApiError(
-                            message=error_content,
-                            status_code=response.status,
+                            if attempt == retries:
+                                raise ApiError(
+                                    message=error_content,
+                                    status_code=response.status,
+                                )
+                            else:
+                                logger.debug(
+                                    f"Retrying due to server error (attempt {attempt}): "
+                                    f"{error_content}"
+                                )
+                                continue  # Retry
+                        else:
+                            # Client error, do not retry
+                            error_content = await response.text()
+                            raise ApiError(
+                                message=error_content,
+                                status_code=response.status,
+                            )
+                except ApiRateLimitError as e:
+                    raise e
+                except asyncio.TimeoutError:
+                    if attempt == retries:
+                        raise ApiTimeoutError(
+                            timeout=timeout,
+                            base_url=self.base_url,
+                        ) from None
+                    else:
+                        logger.debug(f"Timeout error on attempt {attempt}, retrying...")
+                        continue  # Retry
+                except Exception as e:
+                    # Retry on other exceptions
+                    if attempt == retries:
+                        raise ApiError(message=str(e), base_url=self.base_url) from e
+                    else:
+                        logger.debug(
+                            f"Retrying due to exception (attempt {attempt}): {e}"
                         )
-        except ApiRateLimitError as e:
-            raise e
-        except asyncio.TimeoutError:
-            raise ApiTimeoutError(
-                timeout=timeout,
-                base_url=self.base_url,
-            ) from None
-        except Exception as e:
-            raise ApiError(message=str(e), base_url=self.base_url) from e
+                        continue  # Retry
+        raise ApiError(
+            message=f"Failed to get response after {retries} retries",
+            base_url=self.base_url,
+        )
 
     async def extract_file(
         self,
@@ -149,6 +181,7 @@ class AsyncAurelioClient:
         file_path: Optional[Union[str, Path]] = None,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
+        retries: int = 3,
     ) -> ExtractResponse:
         """Process a document from a file asynchronously.
 
@@ -162,8 +195,9 @@ class AsyncAurelioClient:
             wait (int): Time to wait for document completion in seconds. Default is 30.
                 If set to -1, waits until completion. If the wait time is exceeded,
                 returns the document ID with a "pending" status.
-            polling_interval (int): Time between polling requests in seconds.
+                polling_interval (int): Time between polling requests in seconds.
                 Default is 5s, if polling_interval is 0, polling is disabled.
+            retries (int): Number of times to retry the request in case of failures.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -213,56 +247,85 @@ class AsyncAurelioClient:
             # Add 1 second to the timeout to ensure we get the Document ID
             session_timeout = aiohttp.ClientTimeout(total=wait + 1)
 
-        document_id = None
-        status_code = None
+        extract_response = None
 
-        try:
-            async with aiohttp.ClientSession(timeout=session_timeout) as session:
-                async with session.post(
-                    client_url, data=data, headers=self.headers
-                ) as response:
-                    status_code = response.status
-                    if response.status == 200:
-                        extract_response = ExtractResponse(**await response.json())
-                        document_id = extract_response.document.id
-                    elif response.status == 429:
-                        raise ApiRateLimitError(
-                            status_code=response.status,
-                            base_url=self.base_url,
-                        )
-                    else:
-                        try:
-                            error_content = await response.json()
-                        except Exception:
+        async with aiohttp.ClientSession(timeout=session_timeout) as session:
+            for attempt in range(1, retries + 1):
+                try:
+                    async with session.post(
+                        client_url, data=data, headers=self.headers
+                    ) as response:
+                        if response.status == 200:
+                            extract_response = ExtractResponse(**await response.json())
+                            document_id = extract_response.document.id
+                        elif response.status == 429:
+                            raise ApiRateLimitError(
+                                status_code=response.status,
+                                base_url=self.base_url,
+                            )
+                        elif response.status >= 500:
                             error_content = await response.text()
-                        raise ValueError(error_content)
-
-            if wait == 0:
-                return extract_response
-
-            # If the document is already processed or polling is disabled,
-            # return the response
-            if (
-                extract_response.status in ["completed", "failed"]
-                or polling_interval <= 0
-            ):
-                return extract_response
-
-            # Wait for the document to complete processing
-            return await self.wait_for(
-                document_id=document_id, wait=wait, polling_interval=polling_interval
-            )
-        except ApiRateLimitError as e:
-            raise e
-        except asyncio.TimeoutError:
-            raise ApiTimeoutError(
-                base_url=self.base_url,
-                timeout=session_timeout.total if session_timeout else None,
-            ) from None
-        except Exception as e:
+                            if attempt == retries:
+                                raise ApiError(
+                                    message=error_content,
+                                    status_code=response.status,
+                                )
+                            else:
+                                logger.debug(
+                                    f"Retrying due to server error (attempt {attempt}): "
+                                    f"{error_content}"
+                                )
+                                continue  # Retry
+                        else:
+                            try:
+                                error_content = await response.text()
+                            except Exception:
+                                error_content = await response.text()
+                            raise ApiError(
+                                message=error_content,
+                                status_code=response.status,
+                            )
+                except ApiRateLimitError as e:
+                    raise e
+                except asyncio.TimeoutError:
+                    if attempt == retries:
+                        raise ApiTimeoutError(
+                            base_url=self.base_url,
+                            timeout=session_timeout.total if session_timeout else None,
+                        ) from None
+                    else:
+                        logger.debug(f"Timeout error on attempt {attempt}, retrying...")
+                        continue  # Retry
+                except Exception as e:
+                    if attempt == retries:
+                        raise ApiError(
+                            message=str(e),
+                            base_url=self.base_url,
+                        ) from e
+                    else:
+                        logger.debug(
+                            f"Retrying due to exception (attempt {attempt}): {e}"
+                        )
+                        continue  # Retry
+        if extract_response is None:
             raise ApiError(
-                message=str(e), base_url=self.base_url, status_code=status_code
-            ) from e
+                message=f"Failed to receive a valid response after {retries} retries",
+                base_url=self.base_url,
+            )
+        if wait == 0:
+            return extract_response
+
+        # If the document is already processed or polling is disabled,
+        # return the response
+        if extract_response.status in ["completed", "failed"] or polling_interval <= 0:
+            return extract_response
+
+        # Wait for the document to complete processing
+        return await self.wait_for(
+            document_id=document_id,
+            wait=wait,
+            polling_interval=polling_interval,
+        )
 
     async def extract_url(
         self,
@@ -271,6 +334,7 @@ class AsyncAurelioClient:
         chunk: bool,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
+        retries: int = 3,
     ) -> ExtractResponse:
         """Process a document from a URL asynchronously.
 
@@ -283,6 +347,7 @@ class AsyncAurelioClient:
                 returns the document ID with a "pending" status.
             polling_interval (int): Time between polling requests in seconds.
                 Default is 15s, if polling_interval is 0, polling is disabled.
+            retries (int): Number of times to retry the request in case of failures.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -312,63 +377,88 @@ class AsyncAurelioClient:
             # Add 1 second to the timeout to ensure we get the Document ID
             session_timeout = aiohttp.ClientTimeout(total=wait + 1)
 
-        document_id = None
-        try:
-            async with aiohttp.ClientSession(timeout=session_timeout) as session:
-                async with session.post(
-                    client_url, data=data, headers=self.headers
-                ) as response:
-                    if response.status == 200:
-                        extract_response = ExtractResponse(**await response.json())
-                        document_id = extract_response.document.id
-                    elif response.status == 429:
-                        raise ApiRateLimitError(
-                            status_code=response.status,
-                            base_url=self.base_url,
-                        )
-                    else:
-                        try:
-                            error_content = await response.json()
-                        except Exception:
+        extract_response = None
+
+        async with aiohttp.ClientSession(timeout=session_timeout) as session:
+            for attempt in range(1, retries + 1):
+                try:
+                    async with session.post(
+                        client_url, data=data, headers=self.headers
+                    ) as response:
+                        if response.status == 200:
+                            extract_response = ExtractResponse(**await response.json())
+                            break  # Success
+                        elif response.status == 429:
+                            raise ApiRateLimitError(
+                                status_code=response.status,
+                                base_url=self.base_url,
+                            )
+                        elif response.status >= 500:
                             error_content = await response.text()
+                            if attempt == retries:
+                                raise ApiError(
+                                    message=error_content,
+                                    status_code=response.status,
+                                )
+                            else:
+                                logger.debug(
+                                    f"Server error (attempt {attempt}): {error_content}"
+                                )
+                                continue  # Retry
+                        else:
+                            try:
+                                error_content = await response.json()
+                            except Exception:
+                                error_content = await response.text()
+                            raise ApiError(
+                                message=error_content,
+                                status_code=response.status,
+                            )
+                except ApiRateLimitError as e:
+                    raise e
+                except asyncio.TimeoutError:
+                    if attempt == retries:
+                        raise ApiTimeoutError(
+                            base_url=self.base_url,
+                            timeout=session_timeout.total if session_timeout else None,
+                        ) from None
+                    logger.debug(f"Timeout error on attempt {attempt}, retrying...")
+                    continue  # Retry
+                except Exception as e:
+                    if attempt == retries:
                         raise ApiError(
-                            message=error_content,
-                            status_code=response.status,
+                            message=f"Failed to get response after {retries} retries: {str(e)}",
+                            base_url=self.base_url,
+                        ) from e
+                    else:
+                        logger.debug(
+                            f"Retrying due to exception (attempt {attempt}): {e}"
                         )
+                        continue  # Retry
 
-            if wait == 0:
-                return extract_response
-
-            # If the document is already processed or polling is disabled,
-            # return the response
-            if (
-                extract_response.status in ["completed", "failed"]
-                or polling_interval == 0
-            ):
-                return extract_response
-
-            # Wait for the document to complete processing
-            return await self.wait_for(
-                document_id=document_id, wait=wait, polling_interval=polling_interval
-            )
-        except ApiRateLimitError as e:
-            raise e
-        except asyncio.TimeoutError as e:
-            logger.error(
-                f"Timeout error: {e}, timeout: {session_timeout.total if session_timeout else None}"
-            )
-            raise ApiTimeoutError(
-                base_url=self.base_url,
-                timeout=session_timeout.total if session_timeout else None,
-            ) from None
-        except Exception as e:
+        if extract_response is None:
             raise ApiError(
-                message=str(e),
+                message=f"Failed to receive a valid response after {retries} retries",
                 base_url=self.base_url,
-            ) from e
+            )
+
+        if wait == 0:
+            return extract_response
+
+        # If the document is already processed or polling is disabled,
+        # return the response
+        if extract_response.status in ["completed", "failed"] or polling_interval == 0:
+            return extract_response
+
+        # Wait for the document to complete processing
+        return await self.wait_for(
+            document_id=extract_response.document.id,
+            wait=wait,
+            polling_interval=polling_interval,
+        )
 
     async def get_document(
-        self, document_id: str, timeout: int = 30
+        self, document_id: str, timeout: int = 30, retries: int = 3
     ) -> ExtractResponse:
         """
         Retrieves a processed document asynchronously.
@@ -378,6 +468,8 @@ class AsyncAurelioClient:
             timeout (int): The timeout to keep open the connection to the client in
                 seconds. Defaults to 30 seconds, None means no timeout.
                 After the timeout, raise a timeout error.
+            retries (int): Number of times to retry the request in case of failures.
+                Defaults to 3.
         Returns:
             ExtractResponse: An object containing the response from the API.
 
@@ -389,36 +481,72 @@ class AsyncAurelioClient:
         client_url = f"{self.base_url}/v1/extract/document/{document_id}"
 
         session_timeout = aiohttp.ClientTimeout(total=timeout)
-        async with aiohttp.ClientSession(timeout=session_timeout) as session:
-            try:
-                async with session.get(client_url, headers=self.headers) as response:
-                    if response.status == 200:
-                        return ExtractResponse(**await response.json())
-                    elif response.status == 429:
-                        raise ApiRateLimitError(
-                            message="Rate limit exceeded",
-                            status_code=response.status,
-                            base_url=self.base_url,
-                        )
-                    else:
-                        try:
-                            error_content = await response.json()
-                        except Exception:
+
+        # Implement retries
+        for attempt in range(1, retries + 1):
+            async with aiohttp.ClientSession(timeout=session_timeout) as session:
+                try:
+                    async with session.get(
+                        client_url, headers=self.headers
+                    ) as response:
+                        if response.status == 200:
+                            return ExtractResponse(**await response.json())
+                        elif response.status == 429:
+                            raise ApiRateLimitError(
+                                message="Rate limit exceeded",
+                                status_code=response.status,
+                                base_url=self.base_url,
+                            )
+                        elif response.status >= 500:
+                            # Server error, retry
                             error_content = await response.text()
+                            if attempt == retries:
+                                raise ApiError(
+                                    message=error_content,
+                                    status_code=response.status,
+                                )
+                            else:
+                                logger.debug(
+                                    f"Retrying due to server error (attempt {attempt}): {error_content}"
+                                )
+                                continue  # Retry
+                        else:
+                            # Client error, do not retry
+                            try:
+                                error_content = await response.json()
+                            except Exception:
+                                error_content = await response.text()
+                            raise ApiError(
+                                message=error_content,
+                                status_code=response.status,
+                            )
+                except ApiRateLimitError as e:
+                    raise e
+                except aiohttp.ConnectionTimeoutError as e:
+                    logger.error(
+                        f"Connection timeout: {e}, timeout: "
+                        f"{session_timeout.total if session_timeout else None}"
+                    )
+                    raise ApiTimeoutError(
+                        base_url=self.base_url,
+                        timeout=session_timeout.total if session_timeout else None,
+                    ) from e
+                except Exception as e:
+                    # Retry on other exceptions
+                    if attempt == retries:
                         raise ApiError(
-                            message=error_content,
-                            status_code=response.status,
+                            message=str(e),
+                            base_url=self.base_url,
+                        ) from e
+                    else:
+                        logger.debug(
+                            f"Retrying due to exception (attempt {attempt}): {e}"
                         )
-            except ApiRateLimitError as e:
-                raise e
-            except aiohttp.ConnectionTimeoutError as e:
-                logger.error(
-                    f"Connection timeout: {e}, timeout: {session_timeout.total if session_timeout else None}"
-                )
-                raise ApiTimeoutError(
-                    base_url=self.base_url,
-                    timeout=session_timeout.total if session_timeout else None,
-                ) from e
+                        continue  # Retry
+        raise ApiError(
+            message=f"Failed to get response after {retries} retries",
+            base_url=self.base_url,
+        )
 
     async def wait_for(
         self,
@@ -468,6 +596,7 @@ class AsyncAurelioClient:
         input: Union[str, List[str]],
         model: Annotated[str, Literal["bm25"]],
         timeout: int = 30,
+        retries: int = 3,
     ) -> EmbeddingResponse:
         """Generate embeddings for the given input using the specified model.
 
@@ -477,6 +606,7 @@ class AsyncAurelioClient:
                 Currently, only "bm25" is available.
             timeout (int, optional): The maximum time in seconds to keep the connection open.
                 Defaults to 30 seconds. If exceeded, a timeout error is raised.
+            retries (int, optional): Number of times to retry the request in case of failures.
 
         Returns:
             EmbeddingResponse: An object containing the embedding response from the API.
@@ -490,36 +620,65 @@ class AsyncAurelioClient:
         data = {"input": input, "model": model}
 
         session_timeout = aiohttp.ClientTimeout(total=timeout)
-        try:
-            async with aiohttp.ClientSession(timeout=session_timeout) as session:
-                async with session.post(
-                    client_url, json=data, headers=self.headers
-                ) as response:
-                    if response.status == 200:
-                        return EmbeddingResponse(**await response.json())
-                    elif response.status == 429:
-                        raise ApiRateLimitError(
-                            status_code=response.status,
-                            base_url=self.base_url,
-                        )
-                    else:
-                        try:
-                            error_content = await response.json()
-                        except Exception:
+
+        # Added retry logic similar to extract_url
+        async with aiohttp.ClientSession(timeout=session_timeout) as session:
+            for attempt in range(1, retries + 1):
+                try:
+                    async with session.post(
+                        client_url, json=data, headers=self.headers
+                    ) as response:
+                        if response.status == 200:
+                            return EmbeddingResponse(**await response.json())
+                        elif response.status == 429:
+                            raise ApiRateLimitError(
+                                status_code=response.status,
+                                base_url=self.base_url,
+                            )
+                        elif response.status >= 500:
                             error_content = await response.text()
-                        raise ApiError(
-                            message=error_content,
-                            status_code=response.status,
+                            if attempt == retries:
+                                raise ApiError(
+                                    message=error_content,
+                                    status_code=response.status,
+                                )
+                            else:
+                                logger.debug(
+                                    f"Server error (attempt {attempt}): {error_content}"
+                                )
+                                continue  # Retry
+                        else:
+                            try:
+                                error_content = await response.json()
+                            except Exception:
+                                error_content = await response.text()
+                            raise ApiError(
+                                message=error_content,
+                                status_code=response.status,
+                            )
+                except ApiRateLimitError as e:
+                    raise e
+                except asyncio.TimeoutError:
+                    if attempt == retries:
+                        raise ApiTimeoutError(
+                            base_url=self.base_url,
+                            timeout=session_timeout.total if session_timeout else None,
+                        ) from None
+                    else:
+                        logger.debug(f"Timeout error on attempt {attempt}, retrying...")
+                        continue  # Retry
+                except Exception as e:
+                    if attempt == retries:
+                        raise ApiError(message=str(e), base_url=self.base_url) from e
+                    else:
+                        logger.debug(
+                            f"Retrying due to exception (attempt {attempt}): {e}"
                         )
-        except ApiRateLimitError as e:
-            raise e
-        except asyncio.TimeoutError:
-            raise ApiTimeoutError(
-                base_url=self.base_url,
-                timeout=session_timeout.total if session_timeout else None,
-            ) from None
-        except Exception as e:
-            raise ApiError(message=str(e), base_url=self.base_url) from e
+                        continue  # Retry
+        raise ApiError(
+            message=f"Failed to get response after {retries} retries",
+            base_url=self.base_url,
+        )
 
 
 async def _file_stream_generator(

@@ -14,6 +14,7 @@ class ApiError(Exception):
         document_id: Optional[str] = None,
         base_url: Optional[str] = None,
     ):
+        self.status_code = status_code
         if isinstance(message, dict):
             message = json.dumps(message)
 
@@ -70,6 +71,7 @@ class ApiRateLimitError(Exception):
             full_message += f" Document ID: {document_id}."
         if status_code:
             full_message += f" Status code: {status_code}."
+            self.status_code = status_code
         if base_url:
             full_message += f" Base API URL: {base_url}."
         super().__init__(full_message)

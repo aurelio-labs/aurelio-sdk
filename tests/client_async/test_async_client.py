@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
+from aioresponses import aioresponses
 from dotenv import load_dotenv
 
 from aurelio_sdk.client_async import AsyncAurelioClient
@@ -109,3 +110,23 @@ async def test_async_client_rate_limit_error(client: AsyncAurelioClient):
                 task.cancel()
             # Await canceled tasks to suppress CancelledError
             await asyncio.gather(*pending, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_async_client_retry_on_server_error(client):
+    """Test that the client retries on 5xx server errors"""
+    with aioresponses() as mocked:
+        # Mock 3 consecutive 500 errors
+        for _ in range(3):
+            mocked.post(
+                f"{client.base_url}/v1/extract/url",
+                status=500,
+                body="Internal Server Error",
+            )
+
+        with pytest.raises(ApiError) as exc_info:
+            await client.extract_url(
+                url="https://123.com", quality="low", chunk=True, wait=-1
+            )
+
+        assert "Internal Server Error" in str(exc_info.value)
