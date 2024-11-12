@@ -213,34 +213,6 @@ class AsyncAurelioClient:
 
         client_url = f"{self.base_url}/v1/extract/file"
 
-        # Form data
-        data = aiohttp.FormData()
-        data.add_field("quality", quality)
-        data.add_field("chunk", str(chunk))
-        initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
-        data.add_field("wait", str(initial_wait))
-
-        # Handle file from path, convert to AsyncGenerator
-        if file_path:
-            logger.debug(f"Uploading file from path, {file_path}")
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"File not found: {file_path}")
-            file_stream = _file_stream_generator(file_path)
-            filename = Path(file_path).name
-
-            # Wrap the AsyncGenerator with an AsyncIterablePayload
-            file_payload = aiohttp.payload.AsyncIterablePayload(value=file_stream)
-            file_payload.content_type
-            data.add_field(
-                name="file",
-                value=file_payload,
-                filename=filename,
-                content_type=file_payload.content_type,
-            )
-        else:
-            logger.debug("Uploading file bytes")
-            data.add_field("file", file)
-
         if wait <= 0:
             session_timeout = None
         else:
@@ -249,8 +221,49 @@ class AsyncAurelioClient:
 
         extract_response = None
 
+        # If file is a file-like object, reset its position before retries
+        if hasattr(file, 'seek')
+            initial_file_position = file.tell()
+        else:
+            initial_file_position = None
+
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
             for attempt in range(1, retries + 1):
+                # Form data
+                data = aiohttp.FormData()
+                data.add_field("quality", quality)
+                data.add_field("chunk", str(chunk))
+                initial_wait = (
+                    WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
+                )
+                data.add_field("wait", str(initial_wait))
+
+                # Handle file from path, convert to AsyncGenerator
+                if file_path:
+                    logger.debug(f"Uploading file from path, {file_path}")
+                    if not os.path.exists(file_path):
+                        raise FileNotFoundError(f"File not found: {file_path}")
+                    file_stream = _file_stream_generator(file_path)
+                    filename = Path(file_path).name
+
+                    # Wrap the AsyncGenerator with an AsyncIterablePayload
+                    file_payload = aiohttp.payload.AsyncIterablePayload(
+                        value=file_stream
+                    )
+                    file_payload.content_type
+                    data.add_field(
+                        name="file",
+                        value=file_payload,
+                        filename=filename,
+                        content_type=file_payload.content_type,
+                    )
+                else:
+                    logger.debug("Uploading file bytes")
+                    # Reset file-like object position
+                    if initial_file_position is not None:
+                        file.seek(initial_file_position)
+                    data.add_field("file", file)
+
                 try:
                     async with session.post(
                         client_url, data=data, headers=self.headers
@@ -358,18 +371,6 @@ class AsyncAurelioClient:
             APIError: If there's an error in the API response.
         """
         client_url = f"{self.base_url}/v1/extract/url"
-        data = aiohttp.FormData()
-        data.add_field("url", url)
-        data.add_field("quality", quality)
-        data.add_field("chunk", str(chunk))
-
-        # If polling is enabled (polling_interval > 0), use a short wait time
-        # (WAIT_TIME_BEFORE_POLLING)
-        # If polling is disabled (polling_interval <= 0), use the full wait time
-        initial_request_timeout = (
-            WAIT_TIME_BEFORE_POLLING if polling_interval < 0 else wait
-        )
-        data.add_field("wait", str(initial_request_timeout))
 
         if wait <= 0:
             session_timeout = None
@@ -381,6 +382,19 @@ class AsyncAurelioClient:
 
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
             for attempt in range(1, retries + 1):
+                data = aiohttp.FormData()
+                data.add_field("url", url)
+                data.add_field("quality", quality)
+                data.add_field("chunk", str(chunk))
+
+                # If polling is enabled (polling_interval > 0), use a short wait time
+                # (WAIT_TIME_BEFORE_POLLING)
+                # If polling is disabled (polling_interval <= 0), use the full wait time
+                initial_request_timeout = (
+                    WAIT_TIME_BEFORE_POLLING if polling_interval < 0 else wait
+                )
+                data.add_field("wait", str(initial_request_timeout))
+
                 try:
                     async with session.post(
                         client_url, data=data, headers=self.headers
@@ -617,13 +631,13 @@ class AsyncAurelioClient:
             ApiRateLimitError: If the rate limit is exceeded.
         """
         client_url = f"{self.base_url}/v1/embeddings"
-        data = {"input": input, "model": model}
 
         session_timeout = aiohttp.ClientTimeout(total=timeout)
 
         # Added retry logic similar to extract_url
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
             for attempt in range(1, retries + 1):
+                data = {"input": input, "model": model}
                 try:
                     async with session.post(
                         client_url, json=data, headers=self.headers
