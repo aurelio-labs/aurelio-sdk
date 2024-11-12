@@ -2,7 +2,7 @@ import json
 from typing import Optional, Union
 
 
-class APIError(Exception):
+class ApiError(Exception):
     """
     Exception for API errors.
     """
@@ -14,6 +14,7 @@ class APIError(Exception):
         document_id: Optional[str] = None,
         base_url: Optional[str] = None,
     ):
+        self.status_code = status_code
         if isinstance(message, dict):
             message = json.dumps(message)
 
@@ -22,15 +23,15 @@ class APIError(Exception):
         else:
             full_message = f"[AurelioSDK] API request failed: {message}."
         if document_id:
-            full_message += f" Document ID: {document_id}"
+            full_message += f" Document ID: {document_id}."
         if status_code:
-            full_message += f" Status code: {status_code}"
+            full_message += f" Status code: {status_code}."
         if base_url:
-            full_message += f" Base URL: {base_url}"
+            full_message += f" Base API URL: {base_url}."
         super().__init__(full_message)
 
 
-class APITimeoutError(TimeoutError):
+class ApiTimeoutError(TimeoutError):
     """
     Exception for timeout errors.
     """
@@ -48,9 +49,29 @@ class APITimeoutError(TimeoutError):
         super().__init__(message)
 
 
-class FileNotFoundError(Exception):
+class ApiRateLimitError(Exception):
     """
-    Exception for file not found errors.
+    Exception for rate limit errors.
     """
 
-    pass
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        status_code: Optional[int] = None,
+        document_id: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        if isinstance(message, dict):
+            message = json.dumps(message)
+
+        full_message = "[AurelioSDK] API rate limit exceeded."
+        if message:
+            full_message += f" {message}."
+        if document_id:
+            full_message += f" Document ID: {document_id}."
+        if status_code:
+            full_message += f" Status code: {status_code}."
+            self.status_code = status_code
+        if base_url:
+            full_message += f" Base API URL: {base_url}."
+        super().__init__(full_message)
