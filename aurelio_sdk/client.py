@@ -413,7 +413,6 @@ class AurelioClient:
                     continue  # Retry
             except Exception as e:
                 if attempt == retries:
-                    logger.error(f"Error on attempt {attempt}: {e}")
                     raise ApiError(
                         message=str(e),
                         base_url=self.base_url,
