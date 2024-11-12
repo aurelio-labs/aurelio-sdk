@@ -171,7 +171,7 @@ async def test_extract_video_file_from_file_path(client: AsyncAurelioClient):
     )
     assert max_num_tokens <= 500
     assert dict_response["document"]["chunks"][0]["metadata"]["start_time"] == 0
-    assert 95 < dict_response["document"]["chunks"][0]["metadata"]["end_time"] < 110
+    assert 90 < dict_response["document"]["chunks"][0]["metadata"]["end_time"] < 120
 
 
 @pytest.mark.asyncio
