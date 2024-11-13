@@ -93,7 +93,7 @@ async def test_extract_pdf_file_no_chunks(client: AsyncAurelioClient):
     assert dict_response["status"] == "completed"
 
     # Usage
-    # assert dict_response["usage"]["tokens"] is None #TODO: this should be None, if chunk is False
+    assert dict_response["usage"]["tokens"] is None
     assert dict_response["usage"]["pages"] == 7
     assert dict_response["usage"]["seconds"] is None
 

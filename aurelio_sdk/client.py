@@ -112,7 +112,7 @@ class AurelioClient:
                     timeout=timeout,
                 )
                 if response.status_code == 200:
-                    return ChunkResponse(**response.json())
+                    return ChunkResponse(**response.json())  # Success
                 elif response.status_code == 429:
                     raise ApiRateLimitError(
                         status_code=response.status_code,
@@ -211,8 +211,6 @@ class AurelioClient:
                 fields={**fields, "file": (filename, file)}
             )
 
-        document_id = None
-        response = None
         session_timeout = wait + 1 if wait > 0 else None
 
         for attempt in range(1, retries + 1):
@@ -230,7 +228,7 @@ class AurelioClient:
 
                 if response.status_code == 200:
                     extract_response = ExtractResponse(**response.json())
-                    document_id = extract_response.document.id
+                    break  # Success
                 elif response.status_code == 429:
                     raise ApiRateLimitError(
                         status_code=response.status_code,
@@ -259,23 +257,6 @@ class AurelioClient:
                         status_code=response.status_code,
                         base_url=self.base_url,
                     )
-                if wait == 0:
-                    return extract_response
-
-                # If the document is already processed or polling is disabled,
-                # return the response
-                if (
-                    extract_response.status in ["completed", "failed"]
-                    or polling_interval <= 0
-                ):
-                    return extract_response
-
-                # Wait for the document to complete processing
-                return self.wait_for(
-                    document_id=document_id,
-                    wait=wait,
-                    polling_interval=polling_interval,
-                )
             except ApiRateLimitError as e:
                 raise e
             except requests.exceptions.Timeout:
@@ -293,9 +274,26 @@ class AurelioClient:
                 else:
                     logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
                     continue  # Retry
-        raise ApiError(
-            message=f"Failed to get response after {retries} retries",
-            base_url=self.base_url,
+
+        if extract_response is None:
+            raise ApiError(
+                message=f"Failed to receive a valid response after {retries} retries",
+                base_url=self.base_url,
+            )
+
+        if wait == 0:
+            return extract_response
+
+        # If the document is already processed or polling is disabled,
+        # return the response
+        if extract_response.status in ["completed", "failed"] or polling_interval <= 0:
+            return extract_response
+
+        # Wait for the document to complete processing
+        return self.wait_for(
+            document_id=extract_response.document.id,
+            wait=wait,
+            polling_interval=polling_interval,
         )
 
     def extract_url(
@@ -341,8 +339,6 @@ class AurelioClient:
         initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
         data["wait"] = initial_wait
 
-        document_id = None
-        response = None
         session_timeout = wait + 1 if wait > 0 else None
 
         for attempt in range(1, retries + 1):
@@ -353,7 +349,8 @@ class AurelioClient:
 
                 if response.status_code == 200:
                     extract_response = ExtractResponse(**response.json())
-                    document_id = extract_response.document.id
+                    break  # Success
+
                 elif response.status_code == 429:
                     raise ApiRateLimitError(
                         status_code=response.status_code,
@@ -383,23 +380,6 @@ class AurelioClient:
                         base_url=self.base_url,
                     )
 
-                if wait == 0:
-                    return extract_response
-
-                # If the document is already processed or polling is disabled,
-                # return the response
-                if (
-                    extract_response.status in ["completed", "failed"]
-                    or polling_interval <= 0
-                ):
-                    return extract_response
-
-                # Wait for the document to complete processing
-                return self.wait_for(
-                    document_id=document_id,
-                    wait=wait,
-                    polling_interval=polling_interval,
-                )
             except ApiRateLimitError as e:
                 raise e
             except requests.exceptions.Timeout:
@@ -420,9 +400,26 @@ class AurelioClient:
                 else:
                     logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
                     continue  # Retry
-        raise ApiError(
-            message=f"Failed to get response after {retries} retries",
-            base_url=self.base_url,
+
+        if extract_response is None:
+            raise ApiError(
+                message=f"Failed to receive a valid response after {retries} retries",
+                base_url=self.base_url,
+            )
+
+        if wait == 0:
+            return extract_response
+
+        # If the document is already processed or polling is disabled,
+        # return the response
+        if extract_response.status in ["completed", "failed"] or polling_interval <= 0:
+            return extract_response
+
+        # Wait for the document to complete processing
+        return self.wait_for(
+            document_id=extract_response.document.id,
+            wait=wait,
+            polling_interval=polling_interval,
         )
 
     def get_document(
