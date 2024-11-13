@@ -252,6 +252,7 @@ class AsyncAurelioClient:
                         filename=filename,
                         content_type=file_payload.content_type,
                     )
+                # Handles file bytes
                 else:
                     logger.debug("Uploading file bytes")
                     try:
@@ -274,9 +275,11 @@ class AsyncAurelioClient:
                     async with session.post(
                         client_url, data=data, headers=self.headers
                     ) as response:
+                        logger.debug("Calling API")
                         if response.status == 200:
                             extract_response = ExtractResponse(**await response.json())
                             document_id = extract_response.document.id
+                            break  # Success
                         elif response.status == 429:
                             raise ApiRateLimitError(
                                 status_code=response.status,
