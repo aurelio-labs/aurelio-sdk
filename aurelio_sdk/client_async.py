@@ -279,7 +279,7 @@ class AsyncAurelioClient:
                         if response.status == 200:
                             extract_response = ExtractResponse(**await response.json())
                             document_id = extract_response.document.id
-                            break # Success
+                            break  # Success
                         elif response.status == 429:
                             raise ApiRateLimitError(
                                 status_code=response.status,
