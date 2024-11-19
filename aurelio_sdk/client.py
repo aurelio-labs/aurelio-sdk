@@ -55,6 +55,7 @@ class AurelioClient:
         api_key: Optional[str] = None,
         base_url: str = "https://api.aurelio.ai",
         debug: bool = False,
+        source: str = "aurelio-sdk",
     ):
         if not base_url:
             self.base_url = "https://api.aurelio.ai"
@@ -72,6 +73,7 @@ class AurelioClient:
             logger.setLevel(logging.DEBUG)
 
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
+        self.source = source
 
     def chunk(
         self,
@@ -89,7 +91,7 @@ class AurelioClient:
                 seconds. Defaults to 30 seconds.
                 After the timeout, raise a timeout error.
             retries: Number of times to retry the request in case of failures.
-
+                Defaults to 3. Retries on 5xx errors.
         Returns:
             ChunkResponse: Object containing the response from the API.
 
@@ -144,11 +146,7 @@ class AurelioClient:
             except ApiRateLimitError as e:
                 raise e
             except Exception as e:
-                if attempt == retries:
-                    raise ApiError(message=str(e), base_url=self.base_url) from e
-                else:
-                    logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
-                    continue  # Retry
+                raise ApiError(message=str(e), base_url=self.base_url) from e  # break
         raise ApiError(
             message=f"Failed to get response after {retries} retries",
             base_url=self.base_url,
@@ -176,7 +174,7 @@ class AurelioClient:
             polling_interval (int): Time between polling requests in seconds.
                 Default is 5s, if polling_interval is 0, polling is disabled.
             retries: Number of times to retry the request in case of failures.
-                Defaults to 3.
+                Defaults to 3. Retries on 5xx errors.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -269,11 +267,7 @@ class AurelioClient:
                     logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                     continue  # Retry
             except Exception as e:
-                if attempt == retries:
-                    raise ApiError(message=str(e), base_url=self.base_url) from e
-                else:
-                    logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
-                    continue  # Retry
+                raise ApiError(message=str(e), base_url=self.base_url) from e  # break
 
         if extract_response is None:
             raise ApiError(
@@ -392,14 +386,10 @@ class AurelioClient:
                     logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                     continue  # Retry
             except Exception as e:
-                if attempt == retries:
-                    raise ApiError(
-                        message=str(e),
-                        base_url=self.base_url,
-                    ) from e
-                else:
-                    logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
-                    continue  # Retry
+                raise ApiError(
+                    message=str(e),
+                    base_url=self.base_url,
+                ) from e  # break
 
         if extract_response is None:
             raise ApiError(
@@ -446,7 +436,8 @@ class AurelioClient:
                     client_url, headers=self.headers, timeout=timeout
                 )
                 if response.status_code == 200:
-                    return ExtractResponse(**response.json())
+                    return ExtractResponse(**response.json())  # Success
+
                 elif response.status_code == 429:
                     raise ApiRateLimitError(
                         status_code=response.status_code,
@@ -487,14 +478,11 @@ class AurelioClient:
                     logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                     continue  # Retry
             except Exception as e:
-                if attempt == retries:
-                    logger.error(f"Error on attempt {attempt}: {e}")
-                    raise ApiError(message=str(e), base_url=self.base_url) from e
-                else:
-                    logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
-                    continue  # Retry
+                logger.error(f"Error getting document: {e}")
+                raise ApiError(message=str(e), base_url=self.base_url) from e  # break
+
         raise ApiError(
-            message=f"Failed to get response after {retries} retries",
+            message="Failed to get response from document endpoint",
             base_url=self.base_url,
         )
 
@@ -617,16 +605,12 @@ class AurelioClient:
                     logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                     continue  # Retry
             except Exception as e:
-                if attempt == retries:
-                    logger.error(f"Error on attempt {attempt}: {e}")
-                    raise ApiError(
-                        message=str(e),
-                        base_url=self.base_url,
-                    ) from e
-                else:
-                    logger.debug(f"Retrying due to exception (attempt {attempt}): {e}")
-                    continue  # Retry
+                logger.error(f"Error getting embedding: {e}")
+                raise ApiError(  # break
+                    message=str(e),
+                    base_url=self.base_url,
+                ) from e
         raise ApiError(
-            message=f"Failed to get response after {retries} retries",
+            message="Failed to get response from embedding endpoint",
             base_url=self.base_url,
         )

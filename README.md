@@ -76,10 +76,9 @@ from aurelio_sdk import ExtractResponse
 # From a local file
 file_path = "path/to/your/file.pdf"
 
-with open(file_path, "rb") as file:
-    response_pdf_file: ExtractResponse = client.extract_file(
-        file=file, quality="low", chunk=True, wait=-1
-    )
+response_pdf_file: ExtractResponse = client.extract_file(
+    file_path=file_path, quality="low", chunk=True, wait=-1
+)
 ```
 
 #### Video Files
@@ -90,10 +89,10 @@ from aurelio_sdk import ExtractResponse
 # From a local file
 file_path = "path/to/your/file.mp4"
 
-with open(file_path, "rb") as file:
-    response_video_file: ExtractResponse = client.extract_file(
-        file=file, quality="low", chunk=True, wait=-1
-    )
+
+response_video_file: ExtractResponse = client.extract_file(
+    file_path=file_path, quality="low", chunk=True, wait=-1
+)
 ```
 
 ### Extracting Text from URLs
