@@ -3,9 +3,8 @@ import io
 import logging
 import os
 import time
-from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import IO, Annotated, List, Literal, Optional, Union
+from typing import IO, Annotated, AsyncGenerator, List, Literal, Optional, Union
 
 import aiofiles
 import aiofiles.os
@@ -63,6 +62,7 @@ class AsyncAurelioClient:
         api_key: Optional[str] = None,
         base_url: str = "https://api.aurelio.ai",
         debug: bool = False,
+        source: str = "aurelio-sdk",
     ):
         if not base_url:
             self.base_url = "https://api.aurelio.ai"
@@ -81,6 +81,7 @@ class AsyncAurelioClient:
             logger.setLevel(logging.DEBUG)
 
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
+        self.source = source
 
     async def chunk(
         self,
@@ -154,23 +155,17 @@ class AsyncAurelioClient:
                 except asyncio.TimeoutError:
                     if attempt == retries:
                         raise ApiTimeoutError(
-                            timeout=timeout,
-                            base_url=self.base_url,
+                            timeout=timeout, base_url=self.base_url
                         ) from None
                     else:
                         logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                         continue  # Retry
                 except Exception as e:
-                    # Retry on other exceptions
-                    if attempt == retries:
-                        raise ApiError(message=str(e), base_url=self.base_url) from e
-                    else:
-                        logger.debug(
-                            f"Retrying due to exception (attempt {attempt}): {e}"
-                        )
-                        continue  # Retry
+                    raise ApiError(
+                        message=str(e), base_url=self.base_url
+                    ) from e  # break
         raise ApiError(
-            message=f"Failed to get response after {retries} retries",
+            message="Failed to get chunk response",
             base_url=self.base_url,
         )
 
@@ -183,6 +178,7 @@ class AsyncAurelioClient:
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
         retries: int = 3,
+        chunk_size: int = UPLOAD_CHUNK_SIZE,
     ) -> ExtractResponse:
         """Process a document from a file asynchronously.
 
@@ -199,6 +195,9 @@ class AsyncAurelioClient:
                 polling_interval (int): Time between polling requests in seconds.
                 Default is 5s, if polling_interval is 0, polling is disabled.
             retries (int): Number of times to retry the request in case of failures.
+                Defaults to 3. Retries on 5xx errors.
+            chunk_size (int): The size of the chunks to read from the file.
+                Defaults to 40MB.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -235,26 +234,115 @@ class AsyncAurelioClient:
 
                 # Handle file from path, convert to AsyncGenerator
                 if file_path:
-                    logger.debug(f"Uploading file from path, {file_path}")
-                    if not os.path.exists(file_path):
+                    if not await aiofiles.os.path.exists(file_path):
                         raise FileNotFoundError(f"File not found: {file_path}")
-                    file_stream = _file_stream_generator(file_path)
-                    filename = Path(file_path).name
 
-                    # Wrap the AsyncGenerator with an AsyncIterablePayload
-                    file_payload = aiohttp.payload.AsyncIterablePayload(
-                        value=file_stream
-                    )
-                    file_payload.content_type
-                    data.add_field(
-                        name="file",
-                        value=file_payload,
-                        filename=filename,
-                        content_type=file_payload.content_type,
-                    )
+                    # Open the file and keep it open during the API call
+                    async with aiofiles.open(file_path, "rb") as file_buffer:
+                        filename = Path(file_path).name
+                        file_size = await aiofiles.os.path.getsize(file_path)
+
+                        # Stream the file in chunks
+                        async def _file_stream() -> AsyncGenerator[bytes, None]:
+                            total_bytes = 0
+                            chunk_count = 0
+                            try:
+                                while True:
+                                    chunk = await file_buffer.read(chunk_size)
+                                    if not chunk:
+                                        break
+                                    yield chunk
+                                    total_bytes += len(chunk)
+                                    chunk_count += 1
+                                    logger.debug(
+                                        f"Reading chunk {chunk_count}, chunk_size: "
+                                        f"{chunk_size / 1024 / 1024:.2f} MB, "
+                                        f"total size: {total_bytes / 1024 / 1024:.2f} MB"
+                                    )
+
+                                if total_bytes != file_size:
+                                    logger.warning(
+                                        f"File size mismatch: expected {file_size} bytes, "
+                                        f"but read {total_bytes} bytes"
+                                    )
+                            except Exception as e:
+                                logger.error(f"Error during file streaming: {str(e)}")
+                                raise
+
+                        # Wrap the AsyncGenerator with an AsyncIterablePayload
+                        file_payload = aiohttp.payload.AsyncIterablePayload(
+                            _file_stream()
+                        )
+                        file_payload.content_type
+                        data.add_field(
+                            name="file",
+                            value=file_payload,
+                            filename=filename,
+                            content_type=file_payload.content_type,
+                        )
+
+                        # Call the API within the same context to keep the file open
+                        try:
+                            async with session.post(
+                                client_url, data=data, headers=self.headers
+                            ) as response:
+                                logger.debug("Calling API")
+                                if response.status == 200:
+                                    extract_response = ExtractResponse(
+                                        **await response.json()
+                                    )
+                                    document_id = extract_response.document.id
+                                    break  # Success
+                                elif response.status == 429:
+                                    raise ApiRateLimitError(
+                                        status_code=response.status,
+                                        base_url=self.base_url,
+                                    )
+                                elif response.status >= 500:
+                                    error_content = await response.text()
+                                    if attempt == retries:
+                                        raise ApiError(
+                                            message=error_content,
+                                            status_code=response.status,
+                                        )
+                                    else:
+                                        logger.debug(
+                                            f"Retrying due to server error (attempt {attempt}): "
+                                            f"{error_content}"
+                                        )
+                                        continue  # Retry
+                                else:
+                                    try:
+                                        error_content = await response.text()
+                                    except Exception:
+                                        error_content = await response.text()
+                                    raise ApiError(
+                                        message=error_content,
+                                        status_code=response.status,
+                                    )
+                        except ApiRateLimitError as e:
+                            raise e from None
+                        except asyncio.TimeoutError:
+                            if attempt == retries:
+                                raise ApiTimeoutError(
+                                    base_url=self.base_url,
+                                    timeout=session_timeout.total
+                                    if session_timeout
+                                    else None,
+                                ) from None
+                            else:
+                                logger.debug(
+                                    f"Timeout error on attempt {attempt}, retrying..."
+                                )
+                                continue  # Retry
+                        except Exception as e:
+                            raise ApiError(
+                                message=str(e),
+                                base_url=self.base_url,
+                            ) from e
+
                 # Handles file bytes
                 else:
-                    logger.debug("Uploading file bytes")
                     try:
                         if isinstance(file, (bytes, bytearray)):
                             data.add_field("file", file)
@@ -271,67 +359,69 @@ class AsyncAurelioClient:
                             base_url=self.base_url,
                         ) from e
 
-                try:
-                    async with session.post(
-                        client_url, data=data, headers=self.headers
-                    ) as response:
-                        logger.debug("Calling API")
-                        if response.status == 200:
-                            extract_response = ExtractResponse(**await response.json())
-                            document_id = extract_response.document.id
-                            break  # Success
-                        elif response.status == 429:
-                            raise ApiRateLimitError(
-                                status_code=response.status,
-                                base_url=self.base_url,
-                            )
-                        elif response.status >= 500:
-                            error_content = await response.text()
-                            if attempt == retries:
+                    # Call the API
+                    try:
+                        async with session.post(
+                            client_url, data=data, headers=self.headers
+                        ) as response:
+                            logger.debug("Calling API")
+                            if response.status == 200:
+                                extract_response = ExtractResponse(
+                                    **await response.json()
+                                )
+                                document_id = extract_response.document.id
+                                break  # Success
+                            elif response.status == 429:
+                                raise ApiRateLimitError(
+                                    status_code=response.status,
+                                    base_url=self.base_url,
+                                )
+                            elif response.status >= 500:
+                                error_content = await response.text()
+                                if attempt == retries:
+                                    raise ApiError(
+                                        message=error_content,
+                                        status_code=response.status,
+                                    )
+                                else:
+                                    logger.debug(
+                                        f"Retrying due to server error (attempt {attempt}): "
+                                        f"{error_content}"
+                                    )
+                                    continue  # Retry
+                            else:
+                                try:
+                                    error_content = await response.text()
+                                except Exception:
+                                    error_content = await response.text()
                                 raise ApiError(
                                     message=error_content,
                                     status_code=response.status,
                                 )
-                            else:
-                                logger.debug(
-                                    f"Retrying due to server error (attempt {attempt}): "
-                                    f"{error_content}"
-                                )
-                                continue  # Retry
+                    except ApiRateLimitError as e:
+                        raise e from None
+                    except asyncio.TimeoutError:
+                        if attempt == retries:
+                            raise ApiTimeoutError(
+                                base_url=self.base_url,
+                                timeout=session_timeout.total
+                                if session_timeout
+                                else None,
+                            ) from None
                         else:
-                            try:
-                                error_content = await response.text()
-                            except Exception:
-                                error_content = await response.text()
-                            raise ApiError(
-                                message=error_content,
-                                status_code=response.status,
+                            logger.debug(
+                                f"Timeout error on attempt {attempt}, retrying..."
                             )
-                except ApiRateLimitError as e:
-                    raise e from None
-                except asyncio.TimeoutError:
-                    if attempt == retries:
-                        raise ApiTimeoutError(
-                            base_url=self.base_url,
-                            timeout=session_timeout.total if session_timeout else None,
-                        ) from None
-                    else:
-                        logger.debug(f"Timeout error on attempt {attempt}, retrying...")
-                        continue  # Retry
-                except Exception as e:
-                    if attempt == retries:
+                            continue  # Retry
+                    except Exception as e:
                         raise ApiError(
                             message=str(e),
                             base_url=self.base_url,
                         ) from e
-                    else:
-                        logger.debug(
-                            f"Retrying due to exception (attempt {attempt}): {e}"
-                        )
-                        continue  # Retry
+
         if extract_response is None:
             raise ApiError(
-                message=f"Failed to receive a valid response after {retries} retries",
+                message="Failed to get document response",
                 base_url=self.base_url,
             )
         if wait == 0:
@@ -429,6 +519,7 @@ class AsyncAurelioClient:
                                 )
                                 continue  # Retry
                         else:
+                            # client error, do not retry
                             try:
                                 error_content = await response.json()
                             except Exception:
@@ -448,20 +539,14 @@ class AsyncAurelioClient:
                     logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                     continue  # Retry
                 except Exception as e:
-                    if attempt == retries:
-                        raise ApiError(
-                            message=f"Failed to get response after {retries} retries: {str(e)}",
-                            base_url=self.base_url,
-                        ) from e
-                    else:
-                        logger.debug(
-                            f"Retrying due to exception (attempt {attempt}): {e}"
-                        )
-                        continue  # Retry
+                    raise ApiError(
+                        message=f"Failed to get response after {retries} retries: {str(e)}",
+                        base_url=self.base_url,
+                    ) from e
 
         if extract_response is None:
             raise ApiError(
-                message=f"Failed to receive a valid response after {retries} retries",
+                message=f"Failed to get document response from url {url}",
                 base_url=self.base_url,
             )
 
@@ -505,9 +590,8 @@ class AsyncAurelioClient:
 
         session_timeout = aiohttp.ClientTimeout(total=timeout)
 
-        # Implement retries
-        for attempt in range(1, retries + 1):
-            async with aiohttp.ClientSession(timeout=session_timeout) as session:
+        async with aiohttp.ClientSession(timeout=session_timeout) as session:
+            for attempt in range(1, retries + 1):
                 try:
                     async with session.get(
                         client_url, headers=self.headers
@@ -530,7 +614,8 @@ class AsyncAurelioClient:
                                 )
                             else:
                                 logger.debug(
-                                    f"Retrying due to server error (attempt {attempt}): {error_content}"
+                                    f"Retrying due to server error (attempt {attempt}): "
+                                    f"{error_content}"
                                 )
                                 continue  # Retry
                         else:
@@ -555,19 +640,13 @@ class AsyncAurelioClient:
                         timeout=session_timeout.total if session_timeout else None,
                     ) from e
                 except Exception as e:
-                    # Retry on other exceptions
-                    if attempt == retries:
-                        raise ApiError(
-                            message=str(e),
-                            base_url=self.base_url,
-                        ) from e
-                    else:
-                        logger.debug(
-                            f"Retrying due to exception (attempt {attempt}): {e}"
-                        )
-                        continue  # Retry
+                    raise ApiError(
+                        message=str(e),
+                        base_url=self.base_url,
+                    ) from e
+
         raise ApiError(
-            message=f"Failed to get response after {retries} retries",
+            message=f"Failed to get document {document_id} response",
             base_url=self.base_url,
         )
 
@@ -691,40 +770,8 @@ class AsyncAurelioClient:
                         logger.debug(f"Timeout error on attempt {attempt}, retrying...")
                         continue  # Retry
                 except Exception as e:
-                    if attempt == retries:
-                        raise ApiError(message=str(e), base_url=self.base_url) from e
-                    else:
-                        logger.debug(
-                            f"Retrying due to exception (attempt {attempt}): {e}"
-                        )
-                        continue  # Retry
+                    raise ApiError(message=str(e), base_url=self.base_url) from e
         raise ApiError(
-            message=f"Failed to get response after {retries} retries",
+            message="Failed to get embedding response",
             base_url=self.base_url,
         )
-
-
-async def _file_stream_generator(
-    file_path, chunk_size=UPLOAD_CHUNK_SIZE
-) -> AsyncGenerator[bytes, None]:
-    total_bytes = 0
-    chunk_count = 0
-    file_size = os.path.getsize(file_path)
-
-    async with aiofiles.open(file_path, "rb") as f:
-        while True:
-            chunk = await f.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
-            total_bytes += len(chunk)
-            chunk_count += 1
-            logger.debug(
-                f"Reading chunk {chunk_count}, chunk_size: {chunk_size}, total bytes: {total_bytes}"
-            )
-    logger.debug(
-        f"Stream finished, total chunks: {chunk_count}, file size: {file_size / 1024 / 1024:.2f} MB"
-    )
-    assert (
-        total_bytes == file_size
-    ), f"Expected {file_size} bytes, but read {total_bytes} bytes"
