@@ -198,31 +198,39 @@ class AurelioClient:
         initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
         fields["wait"] = str(initial_wait)
 
-        if file_path:
-            filename = pathlib.Path(file_path).name
-            multipart_encoder = MultipartEncoder(
-                fields={**fields, "file": (filename, open(file_path, "rb"))}
-            )
-        else:
-            filename = getattr(file, "name", "document.pdf")
-            multipart_encoder = MultipartEncoder(
-                fields={**fields, "file": (filename, file)}
-            )
-
         session_timeout = wait + 1 if wait > 0 else None
 
         for attempt in range(1, retries + 1):
             try:
-                session_timeout = wait + 1 if wait > 0 else None
-                response = requests.post(
-                    client_url,
-                    data=multipart_encoder,
-                    headers={
-                        **self.headers,
-                        "Content-Type": multipart_encoder.content_type,
-                    },
-                    timeout=session_timeout,
-                )
+                if file_path:
+                    with open(file_path, "rb") as file_buffer:
+                        filename = pathlib.Path(file_path).name
+                        multipart_encoder = MultipartEncoder(
+                            fields={**fields, "file": (filename, file_buffer)}
+                        )
+                        response = requests.post(
+                            client_url,
+                            data=multipart_encoder,
+                            headers={
+                                **self.headers,
+                                "Content-Type": multipart_encoder.content_type,
+                            },
+                            timeout=session_timeout,
+                        )
+                else:
+                    filename = getattr(file, "name", "document.pdf")
+                    multipart_encoder = MultipartEncoder(
+                        fields={**fields, "file": (filename, file)}
+                    )
+                    response = requests.post(
+                        client_url,
+                        data=multipart_encoder,
+                        headers={
+                            **self.headers,
+                            "Content-Type": multipart_encoder.content_type,
+                        },
+                        timeout=session_timeout,
+                    )
 
                 if response.status_code == 200:
                     extract_response = ExtractResponse(**response.json())
