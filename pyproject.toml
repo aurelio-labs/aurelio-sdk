@@ -74,8 +74,10 @@ ignore_missing_imports = true
 [tool.pytest]
 pythonpath = "."
 
-[tool.dynamic-versioning]
+[tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
 style = "semver"
 pattern = '^v(?P<base>\d+\.\d+\.\d+)$'
+metadata = false                       
+dirty = false
