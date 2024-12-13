@@ -87,7 +87,7 @@ class AsyncAurelioClient:
         self,
         content: str,
         processing_options: Optional[ChunkingOptions] = None,
-        timeout: int = 30,
+        timeout: int = 60,
         retries: int = 3,
     ) -> ChunkResponse:
         """Chunk a document synchronously.
@@ -96,7 +96,7 @@ class AsyncAurelioClient:
             content: The content to chunk.
             processing_options: Processing options for the chunking.
             timeout: The timeout to keep open the connection to the client in
-                seconds. Defaults to 30 seconds, None means no timeout.
+                seconds. Defaults to 60 seconds, None means no timeout.
                 After the timeout, raise a timeout error.
             retries: Number of times to retry the request in case of failures.
 

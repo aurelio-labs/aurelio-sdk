@@ -79,7 +79,7 @@ class AurelioClient:
         self,
         content: str,
         processing_options: Optional[ChunkingOptions] = None,
-        timeout: int = 30,
+        timeout: int = 60,
         retries: int = 3,
     ) -> ChunkResponse:
         """Chunk a document synchronously.
@@ -88,7 +88,7 @@ class AurelioClient:
             content: The content to chunk.
             processing_options: Processing options for the chunking.
             timeout: The timeout to keep open the connection to the client in
-                seconds. Defaults to 30 seconds.
+                seconds. Defaults to 60 seconds.
                 After the timeout, raise a timeout error.
             retries: Number of times to retry the request in case of failures.
                 Defaults to 3. Retries on 5xx errors.
