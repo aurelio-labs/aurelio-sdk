@@ -114,7 +114,7 @@ class ExtractResponse(BaseModel):
 
 # Embeddings Response
 # ----------------------
-class BM25Embedding(BaseModel):
+class SparseEmbedding(BaseModel):
     indices: list[int]
     values: list[float]
 
@@ -127,7 +127,7 @@ class EmbeddingUsage(BaseModel):
 class EmbeddingDataObject(BaseModel):
     object: str = Field(default="embedding", description="The object type")
     index: int = Field(description="The index of the embedding")
-    embedding: BM25Embedding = Field(description="The embedding object")
+    embedding: SparseEmbedding = Field(description="The embedding object")
 
 
 class EmbeddingResponse(BaseModel):
