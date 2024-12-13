@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aurelio-sdk"
-version = "0.0.16"
+version = "0.0.16.post1.dev0+aaa53d2" # Placeholder version; will be replaced by the plugin
 description = "Aurelio Platform SDK"
 authors = ["Team <hello@aurelio.ai>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ packages = [{ include = "aurelio_sdk" }]
 
 [project]
 name = "aurelio-sdk"
-version = "0.0.16"
+version = "0.0.0" # Placeholder version; will be replaced by the plugin
 license = { file = "LICENSE" }
 
 [tool.poetry.dependencies]
@@ -36,8 +36,8 @@ pytest-xdist = "^3.6.1"
 aioresponses = "^0.7.6"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.ruff.lint]
 select = [
@@ -73,3 +73,8 @@ ignore_missing_imports = true
 
 [tool.pytest]
 pythonpath = "."
+
+[tool.dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
