@@ -540,6 +540,7 @@ class AurelioClient:
     def embedding(
         self,
         input: Union[str, List[str]],
+        input_type: Annotated[str, Literal["queries", "documents"]],
         model: Annotated[str, Literal["bm25"]],
         timeout: int = 30,
         retries: int = 3,
@@ -564,7 +565,7 @@ class AurelioClient:
             ApiRateLimitError: If the rate limit is exceeded.
         """
         client_url = f"{self.base_url}/v1/embeddings"
-        data = {"input": input, "model": model}
+        data = {"input": input, "input_type": input_type, "model": model}
 
         for attempt in range(1, retries + 1):
             try:

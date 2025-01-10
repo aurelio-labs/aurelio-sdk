@@ -696,6 +696,7 @@ class AsyncAurelioClient:
     async def embedding(
         self,
         input: Union[str, List[str]],
+        input_type: Annotated[str, Literal["queries", "documents"]],
         model: Annotated[str, Literal["bm25"]],
         timeout: int = 30,
         retries: int = 3,
@@ -725,7 +726,7 @@ class AsyncAurelioClient:
         # Added retry logic similar to extract_url
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
             for attempt in range(1, retries + 1):
-                data = {"input": input, "model": model}
+                data = {"input": input, "input_type": input_type, "model": model}
                 try:
                     async with session.post(
                         client_url, json=data, headers=self.headers
