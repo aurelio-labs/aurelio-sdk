@@ -22,7 +22,7 @@ release = "0.0.18"
 extensions = ["sphinx.ext.autodoc", "sphinx.ext.autosummary", "sphinxawesome_theme"]
 
 templates_path = ["_templates"]
-exclude_patterns = []
+exclude_patterns: list[str] = []
 autosummary_generate = True
 numpydoc_show_class_members = True
 
