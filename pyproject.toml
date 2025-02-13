@@ -35,6 +35,7 @@ pytest-xdist = "^3.6.1"
 aioresponses = "^0.7.6"
 sphinx = "^7.0.0"
 sphinxawesome-theme = "^5.2.0"
+pydoc-markdown="^4.8.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
