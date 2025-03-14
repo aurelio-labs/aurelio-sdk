@@ -5,6 +5,7 @@ This page covers the fundamental concepts of the Aurelio SDK, explaining its key
 Document processing in the Aurelio SDK converts unstructured documents (PDFs) into easily readable markdown that can be further processed or used in AI applications.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart LR
     A[Raw Document] --> B[Document Processor]
     B --> C[Text Extraction]
@@ -37,6 +38,7 @@ response = client.extract_file(
 Chunking is the process of breaking long documents into smaller, semantically meaningful pieces that are optimized for downstream tasks like embedding and retrieval.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart LR
     A[Processed Document] --> B[Chunking Algorithm]
     B --> C{Chunking Type}
@@ -77,6 +79,7 @@ chunk_response = client.chunk(
 Embeddings are dense vector representations of text that capture semantic meaning in a form that machines can process efficiently. They enable semantic search, similarity comparison, and other NLP applications.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart LR
     A[Text Chunks] --> B[Embedding Model]
     B --> C[Vector Space]
@@ -107,6 +110,7 @@ embedding_response = client.embedding(
 The Aurelio SDK offers both synchronous and asynchronous APIs to accommodate different usage patterns.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart TB
     subgraph Synchronous
     A[Request] --> B[Wait]

@@ -3,6 +3,7 @@ This guide provides detailed technical information about document chunking capab
 ## Chunking Flow
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart TB
     A[Document Text] --> B[Preprocessing]
     B --> C{Chunker Type}
@@ -17,11 +18,11 @@ flowchart TB
     
     H --> I[Final Chunks]
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style C fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
-    style D fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
-    style E fill:#e6ffe6,stroke:#00cc00,stroke-width:2px
-    style I fill:#f5f5f5,stroke:#666,stroke-width:2px
+    style A fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style C fill:#6c9ee3,stroke:#ffffff,stroke-width:2px
+    style D fill:#dc5a5a,stroke:#ffffff,stroke-width:2px
+    style E fill:#5adc5a,stroke:#ffffff,stroke-width:2px
+    style I fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ## Chunking Options
@@ -125,14 +126,15 @@ The SDK supports two chunking algorithms, each with different characteristics an
 The default chunking method uses regular expressions to split text based on delimiters.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart TB
     A[Input Text] --> B[Split by Delimiters]
     B --> C[Respect Max Chunk Length]
     C --> D[Merge Short Chunks]
     D --> E[Final Chunks]
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style E fill:#f5f5f5,stroke:#666,stroke-width:2px
+    style A fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style E fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 **Key characteristics:**
@@ -162,6 +164,7 @@ response = client.chunk(
 A more advanced algorithm that attempts to preserve semantic meaning across chunk boundaries.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart TB
     A[Input Text] --> B[Tokenization]
     B --> C[Sentence Boundary Detection]
@@ -169,8 +172,8 @@ flowchart TB
     D --> E[Optimal Boundary Selection]
     E --> F[Final Semantic Chunks]
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style F fill:#f5f5f5,stroke:#666,stroke-width:2px
+    style A fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style F fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 **Key characteristics:**
@@ -202,6 +205,7 @@ The `window_size` parameter controls how much surrounding context is considered 
 Semantic chunking uses a sliding window approach to maintain context across chunk boundaries.
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart LR
     subgraph "Window Size = 1"
         A1[Chunk 1] --- B1[Chunk 2]
@@ -218,9 +222,9 @@ flowchart LR
         B3 --- C3[Chunk 3 with context from 1 & 2]
     end
     
-    style A1 fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style A2 fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style A3 fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style A1 fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style A2 fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style A3 fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ### Impact of Window Size

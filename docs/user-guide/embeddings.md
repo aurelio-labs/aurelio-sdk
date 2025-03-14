@@ -3,15 +3,16 @@ This guide provides detailed technical information about embedding capabilities 
 ## Embedding Flow
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart TB
     A[Input Text] --> B[Preprocessing]
     B --> C[BM25 Embedding Model]
     C --> D[Sparse Vector Generation]
     D --> E[Final Embeddings]
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style C fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
-    style E fill:#f5f5f5,stroke:#666,stroke-width:2px
+    style A fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style C fill:#6c9ee3,stroke:#ffffff,stroke-width:2px
+    style E fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ## Embedding Options
@@ -43,6 +44,7 @@ def embedding(
 The Aurelio SDK uses sparse BM25-style embeddings, which differ from traditional dense embeddings:
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart LR
     subgraph "Dense Embedding"
         A1[Input Text] --> B1[Dense Model]
@@ -54,10 +56,10 @@ flowchart LR
         B2 --> C2[Sparse Vector with Indices & Values]
     end
     
-    style B1 fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
-    style B2 fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
-    style C1 fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style C2 fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style B1 fill:#6c9ee3,stroke:#ffffff,stroke-width:2px
+    style B2 fill:#dc5a5a,stroke:#ffffff,stroke-width:2px
+    style C1 fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style C2 fill:#4182c3,stroke:#ffffff,stroke-width:2px,color:#ffffff
 ```
 
 ### Aurelio Sparse Implementation
