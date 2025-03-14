@@ -38,6 +38,7 @@ Aurelio SDK is particularly useful when:
 The SDK follows a client-based architecture:
 
 ```mermaid
+%%{init: {'theme':'neutral', 'themeVariables': {'darkMode': true, 'primaryColor': '#4182c3', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7a7a7a', 'lineColor': '#7a7a7a', 'secondaryColor': '#f5f5f5', 'tertiaryColor': '#333'}}}%%
 flowchart LR
     A[Your Application] --> B[Aurelio SDK Client]
     B --> C[Aurelio Platform API]
