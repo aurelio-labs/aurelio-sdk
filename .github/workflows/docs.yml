@@ -1,9 +1,10 @@
 name: Release Docs
 
 on:
-  release:
-    types: [ released ]
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+
 jobs:
   build-docs:
     permissions:
@@ -11,40 +12,106 @@ jobs:
       id-token: write
     name: Build Docs
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version:
-        - "3.13"
-    env:
-      POETRY_VERSION: "2.0.1"
     steps:
     - uses: actions/checkout@v4
-    - name: Cache Poetry
-      uses: actions/cache@v4
+    
+    - name: Checkout docs repo
+      uses: actions/checkout@v4
       with:
-        path: ~/.poetry
-        key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-poetry-
-    - name: Install poetry
+        repository: aurelio-labs/docs
+        path: temp-docs
+        ref: main
+        token: ${{ secrets.PAT }}
+
+    - name: Process documentation
       run: |
-        pipx install poetry==$POETRY_VERSION
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: poetry
-    - name: Install dependencies
+        ROOT_DIR=$(pwd)
+
+        # Clean existing documentation in target repo
+        rm -rf temp-docs/aurelio-sdk
+        mkdir -p temp-docs/aurelio-sdk/
+
+        # Process documentation directory
+        echo "Processing docs directory"
+        
+        # Find all markdown files in the directory and its subdirectories
+        find "docs" -type f -name "*.md" | while read file; do
+          # Get the relative path from the docs directory
+          rel_path=$(realpath --relative-to="docs" "$(dirname "$file")")
+          file_name=$(basename "$file")
+          
+          # Create target directory if it doesn't exist
+          if [ "$rel_path" = "." ]; then
+            # File is directly in the docs directory
+            target_dir="$ROOT_DIR/temp-docs/aurelio-sdk"
+          else
+            # File is in a subdirectory
+            target_dir="$ROOT_DIR/temp-docs/aurelio-sdk/$rel_path"
+          fi
+          
+          mkdir -p "$target_dir"
+          
+          # Copy and rename from .md to .mdx
+          cp "$file" "$target_dir/${file_name%.md}.mdx"
+          echo "Copied $file to $target_dir/${file_name%.md}.mdx"
+        done
+
+    - name: Update frontmatter keys
       run: |
-        poetry install --all-extras
-    - name: Build docs
+        find temp-docs/aurelio-sdk -type f -name "*.mdx" -exec sed -i 's/sidebar_label:/sidebarTitle:/g' {} +
+
+    - name: Install jq
+      run: sudo apt-get install -y jq
+
+    - name: Update mintlify docs.json navigation (if needed)
       run: |
-        poetry run sphinx-build -M html docs/source docs/build
-    - name: Authenticate to Google Cloud
-      id: auth
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
-    - name: Upload Docs
+        # Check if docs.json exists and contains the needed structure
+        if grep -q "aurelio-sdk" temp-docs/docs.json; then
+          echo "Updating aurelio-sdk section in docs.json"
+          
+          # Get files and create grouped structure using jq
+          files=$(cd temp-docs/aurelio-sdk && find . -type f -name "*.mdx" | sed 's|^./||' | sed 's|.mdx$||' | sort | jq -R -s '
+            split("\n")[:-1] 
+            | map("aurelio-sdk/" + .) 
+            | reduce .[] as $path (
+                {"root": [], "groups": {}};
+                if ($path | split("/") | length) > 2 then
+                  .groups[$path | split("/")[1]] += [$path]
+                else
+                  .root += [$path]
+                end
+              )
+            | [.root[], (.groups | to_entries | map({
+                "group": .key,
+                "pages": .value
+              }))[]
+            ]
+          ')
+          
+          # Check if Aurelio SDK tab exists
+          if jq -e '.navigation.tabs[] | select(.tab == "Aurelio SDK")' temp-docs/docs.json > /dev/null; then
+            # Tab exists, update it
+            jq --arg pages "$files" '
+              (.navigation.tabs[] | select(.tab == "Aurelio SDK") | .pages) |= ($pages | fromjson)
+            ' temp-docs/docs.json > temp-docs/docs.json.tmp && mv temp-docs/docs.json.tmp temp-docs/docs.json
+          else
+            # Tab doesn't exist, add it
+            jq --arg pages "$files" '
+              .navigation.tabs += [{
+                "tab": "Aurelio SDK",
+                "pages": ($pages | fromjson)
+              }]
+            ' temp-docs/docs.json > temp-docs/docs.json.tmp && mv temp-docs/docs.json.tmp temp-docs/docs.json
+          fi
+        else
+          echo "Warning: Aurelio SDK section not found in docs.json. Manual updates may be required."
+        fi
+
+    - name: Git commit and push
+      working-directory: temp-docs
       run: |
-        gcloud storage rsync docs/build/html gs://docs-bucket-production/aurelio-sdk --recursive --delete-unmatched-destination-objects
+        git config --local user.email "admin@aurelio.ai"
+        git config --local user.name "aurelio-bot"
+        git remote set-url origin https://aurelio-bot:${{ secrets.PAT }}@github.com/aurelio-labs/docs.git
+        git add .
+        git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update aurelio-sdk docs" && git push)
