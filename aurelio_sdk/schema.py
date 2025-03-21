@@ -106,7 +106,7 @@ class ExtractProcessingOptions(BaseModel):
         ...,
         description="Whether the document should be processed with VLM. Only for high quality processing",
     )
-    vlm_model: VlmModel | None = Field(
+    vlm_model: Optional[VlmModel] = Field(
         None,
         description=(
             "The VLM model to use. Only for high quality processing. "
