@@ -18,6 +18,7 @@ from aurelio_sdk.schema import (
     ChunkResponse,
     EmbeddingResponse,
     ExtractResponse,
+    VlmModel,
 )
 
 
@@ -158,6 +159,8 @@ class AurelioClient:
         file_path: Optional[Union[str, pathlib.Path]] = None,
         quality: Literal["low", "high"] = "low",
         chunk: bool = True,
+        vlm: bool = False,
+        vlm_model: VlmModel | None = None,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
         retries: int = 3,
@@ -168,6 +171,10 @@ class AurelioClient:
             file (Union[IO[bytes], bytes]): The file to extract text from (PDF, MP4).
             quality (Literal["low", "high"]): Processing quality of the document.
             chunk (bool): Whether the document should be chunked.
+            vlm (bool): Whether the document should be processed with VLM. Only for
+                high quality processing.
+            vlm_model (VlmModel | None): The VLM model to use. Defaults to
+                gemini/gemini-2.0-flash-lite-preview-02-05.
             wait (int): Time to wait for document completion in seconds. Default is 30.
                 If set to -1, waits until completion. If the wait time is exceeded,
                 returns the document ID with a "pending" status.
@@ -194,6 +201,8 @@ class AurelioClient:
             "quality": str(quality),
             "chunk": str(chunk).lower(),
             "wait": str(wait),
+            "vlm": str(vlm),
+            "vlm_model": vlm_model.value if vlm_model else None,
         }
         initial_wait = WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
         fields["wait"] = str(initial_wait)
@@ -303,6 +312,8 @@ class AurelioClient:
         url: str,
         quality: Literal["low", "high"],
         chunk: bool,
+        vlm: bool = False,
+        vlm_model: VlmModel | None = None,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
         retries: int = 3,
@@ -313,6 +324,10 @@ class AurelioClient:
             url (str): The URL of the document file to be processed.
             quality (Literal["low", "high"]): Processing quality of the document.
             chunk (bool): Whether the document should be chunked.
+            vlm (bool): Whether the document should be processed with VLM. Only for
+                high quality processing.
+            vlm_model (VlmModel | None): The VLM model to use. Defaults to
+                gemini/gemini-2.0-flash-lite-preview-02-05.
             wait (int): Time to wait for document completion in seconds. Default is 30.
                 If set to -1, waits until completion. If the wait time is exceeded,
                 returns the document ID with a "pending" status.
@@ -335,6 +350,8 @@ class AurelioClient:
             "quality": quality,
             "chunk": chunk,
             "wait": wait,
+            "vlm": str(vlm),
+            "vlm_model": vlm_model.value if vlm_model else None,
         }
 
         # If polling is enabled, use a short wait time (WAIT_TIME_BEFORE_POLLING)

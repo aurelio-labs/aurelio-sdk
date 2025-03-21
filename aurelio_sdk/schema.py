@@ -91,10 +91,27 @@ class ProcessingQuality(str, Enum):
     high = "high"
 
 
+# https://models.litellm.ai/
+class VlmModel(str, Enum):
+    gemini = "gemini/gemini-2.0-flash-lite-preview-02-05"
+    llama = "groq/llama-3.2-11b-vision-preview"
+
+
 class ExtractProcessingOptions(BaseModel):
     chunk: bool = Field(..., description="Whether the document should be chunked")
     quality: ProcessingQuality = Field(
         ..., description="Processing quality of the document"
+    )
+    vlm: bool = Field(
+        ...,
+        description="Whether the document should be processed with VLM. Only for high quality processing",
+    )
+    vlm_model: VlmModel | None = Field(
+        None,
+        description=(
+            "The VLM model to use. Only for high quality processing. "
+            "Defaults to gemini/gemini-2.0-flash-lite-preview-02-05"
+        ),
     )
 
 
