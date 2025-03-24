@@ -1,5 +1,3 @@
-# Migration Guide to SDK v0.0.19
-
 This guide helps you migrate your code from previous versions of the Aurelio SDK to v0.0.19, which introduces significant changes to the `extract` endpoint.
 
 ## Key Changes
