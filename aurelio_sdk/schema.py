@@ -16,7 +16,7 @@ class ChunkingOptions(BaseModel):
         default=1, description="The window size for the semantic chunker"
     )
     delimiters: Optional[List[str]] = Field(
-        default_factory=list,
+        default_factory=lambda: [],
         description="Optional. The regex delimiters for the regex chunker",
     )
 
