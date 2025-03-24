@@ -91,10 +91,19 @@ class ProcessingQuality(str, Enum):
     high = "high"
 
 
+class ProcessingModel(str, Enum):
+    aurelio_base = "aurelio-base"
+    docling_base = "docling-base"
+    gemini_2_flash_lite = "gemini-2-flash-lite"
+
+
 class ExtractProcessingOptions(BaseModel):
     chunk: bool = Field(..., description="Whether the document should be chunked")
-    quality: ProcessingQuality = Field(
-        ..., description="Processing quality of the document"
+    quality: ProcessingQuality | None = Field(
+        default=None, description="Deprecated. Use `model` instead."
+    )
+    model: ProcessingModel | None = Field(
+        default=None, description="Processing model to use"
     )
 
 
