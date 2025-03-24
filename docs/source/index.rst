@@ -17,6 +17,7 @@ documentation for details.
 
    Home page <self>
    Quickstart <quickstart>
+   Migration Guide v0.0.19 <user-guide/migration-v0.0.19>
    API reference <_autosummary/aurelio_sdk>
 
 .. autosummary::

@@ -77,7 +77,17 @@ from aurelio_sdk import ExtractResponse
 file_path = "path/to/your/file.pdf"
 
 response_pdf_file: ExtractResponse = client.extract_file(
-    file_path=file_path, quality="low", chunk=True, wait=-1
+    file_path=file_path, model="aurelio-base", chunk=True, wait=-1
+)
+
+# For higher accuracy on complex documents
+response_pdf_file_high: ExtractResponse = client.extract_file(
+    file_path=file_path, model="docling-base", chunk=True, wait=-1
+)
+
+# For state-of-the-art text extraction using a VLM (may be more expensive)
+response_pdf_file_vlm: ExtractResponse = client.extract_file(
+    file_path=file_path, model="gemini-2-flash-lite", chunk=True, wait=-1
 )
 ```
 
@@ -89,9 +99,17 @@ from aurelio_sdk import ExtractResponse
 # From a local file
 file_path = "path/to/your/file.mp4"
 
-
+# Video files only support aurelio-base model
 response_video_file: ExtractResponse = client.extract_file(
-    file_path=file_path, quality="low", chunk=True, wait=-1
+    file_path=file_path, 
+    model="aurelio-base", 
+    chunk=True, 
+    wait=-1,
+    processing_options={
+        "chunking": {
+            "chunker_type": "semantic"  # For better semantic chunking
+        }
+    }
 )
 ```
 
@@ -105,7 +123,12 @@ from aurelio_sdk import ExtractResponse
 # From URL
 url = "https://arxiv.org/pdf/2408.15291"
 response_pdf_url: ExtractResponse = client.extract_url(
-    url=url, quality="low", chunk=True, wait=-1
+    url=url, model="aurelio-base", chunk=True, wait=-1
+)
+
+# For more complex PDFs requiring higher accuracy
+response_pdf_url_high: ExtractResponse = client.extract_url(
+    url=url, model="docling-base", chunk=True, wait=-1
 )
 ```
 
@@ -117,17 +140,25 @@ from aurelio_sdk import ExtractResponse
 # From URL
 url = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
 response_video_url: ExtractResponse = client.extract_url(
-    url=url, quality="low", chunk=True, wait=-1
+    url=url, 
+    model="aurelio-base",  # Only model supported for video
+    chunk=True, 
+    wait=-1,
+    processing_options={
+        "chunking": {
+            "chunker_type": "semantic"  # For better semantic chunking
+        }
+    }
 )
 ```
 
 ### Waiting for completion and checking document status
 
 ```python
-# Set wait time for large files with `high` quality
+# Set wait time for large files with more accurate models
 # Wait time is set to 10 seconds
 response_pdf_url: ExtractResponse = client.extract_url(
-    url="https://arxiv.org/pdf/2408.15291", quality="high", chunk=True, wait=10
+    url="https://arxiv.org/pdf/2408.15291", model="docling-base", chunk=True, wait=10
 )
 
 # Get document status and response
@@ -180,4 +211,8 @@ The `EmbeddingResponse` object contains the following key information:
 2. Use async client for better performance.
 3. For large files or when processing might take longer, enable polling for long-hanging requests.
 4. Always handle potential exceptions and check the status of the response.
-5. Adjust the `quality` parameter based on your needs. "low" is faster but less accurate, while "high" is slower but more accurate.
+5. Choose the appropriate model for your needs:
+   - `aurelio-base`: Fastest and cheapest, good for clean PDFs (equivalent to old "low" quality)
+   - `docling-base`: More accurate for complex documents (equivalent to old "high" quality)
+   - `gemini-2-flash-lite`: State-of-the-art VLM-based extraction, highest accuracy but potential for rare hallucinations
+6. For videos, only `aurelio-base` is supported, but you can customize chunking via processing_options.
