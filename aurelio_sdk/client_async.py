@@ -60,7 +60,7 @@ class AsyncAurelioClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        base_url: str = "https://api.aurelio.ai",
+        base_url: Optional[str] = None,
         debug: bool = False,
         source: str = "aurelio-sdk",
     ):
@@ -171,14 +171,17 @@ class AsyncAurelioClient:
 
     async def extract_file(
         self,
-        quality: Literal["low", "high"],
-        chunk: bool,
+        chunk: bool = False,
+        quality: Optional[Literal["low", "high"]] = None,
         file: Optional[Union[IO[bytes], bytes]] = None,
         file_path: Optional[Union[str, Path]] = None,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
         retries: int = 3,
         chunk_size: int = UPLOAD_CHUNK_SIZE,
+        model: Optional[
+            Literal["aurelio-base", "docling-base", "gemini-2-flash-lite"]
+        ] = None,
     ) -> ExtractResponse:
         """Process a document from a file asynchronously.
 
@@ -187,7 +190,7 @@ class AsyncAurelioClient:
                 The file to extract text from (PDF, MP4).
             file_path (Optional[str]): The path to the file to extract
                 text from.
-            quality (Literal["low", "high"]): Processing quality of the document.
+            quality (Literal["low", "high"]): Processing quality of the document. Deprecated, use model instead.
             chunk (bool): Whether the document should be chunked.
             wait (int): Time to wait for document completion in seconds. Default is 30.
                 If set to -1, waits until completion. If the wait time is exceeded,
@@ -198,6 +201,8 @@ class AsyncAurelioClient:
                 Defaults to 3. Retries on 5xx errors.
             chunk_size (int): The size of the chunks to read from the file.
                 Defaults to 40MB.
+            model (Optional[Literal["aurelio-base", "docling-base", "gemini-2-flash-lite"]]):
+                Processing model to use. If not provided, it will be inferred from quality.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -213,6 +218,26 @@ class AsyncAurelioClient:
 
         client_url = f"{self.base_url}/v1/extract/file"
 
+        # Map quality to model if model is not provided
+        if model is None:
+            # Check if file is video based on extension
+            is_video = False
+            if file_path:
+                file_extension = Path(file_path).suffix.lower()
+                is_video = file_extension in [".mp4"]
+            elif file and hasattr(file, "name"):
+                file_name = getattr(file, "name", "")
+                file_extension = Path(file_name).suffix.lower()
+                is_video = file_extension in [".mp4"]
+
+            # For video files, always use aurelio-base regardless of quality
+            if is_video:
+                model = "aurelio-base"
+            elif quality == "high":
+                model = "docling-base"
+            else:  # quality == "low"
+                model = "aurelio-base"
+
         if wait <= 0:
             session_timeout = None
         else:
@@ -225,7 +250,7 @@ class AsyncAurelioClient:
             for attempt in range(1, retries + 1):
                 # Form data
                 data = aiohttp.FormData()
-                data.add_field("quality", quality)
+                data.add_field("model", model)
                 data.add_field("chunk", str(chunk))
                 initial_wait = (
                     WAIT_TIME_BEFORE_POLLING if polling_interval > 0 else wait
@@ -442,17 +467,20 @@ class AsyncAurelioClient:
     async def extract_url(
         self,
         url: str,
-        quality: Literal["low", "high"],
-        chunk: bool,
+        quality: Optional[Literal["low", "high"]] = None,
+        chunk: bool = False,
         wait: int = 30,
         polling_interval: int = POLLING_INTERVAL,
         retries: int = 3,
+        model: Optional[
+            Literal["aurelio-base", "docling-base", "gemini-2-flash-lite"]
+        ] = None,
     ) -> ExtractResponse:
         """Process a document from a URL asynchronously.
 
         Args:
             url (str): The URL of the document file to be processed.
-            quality (Literal["low", "high"]): Processing quality of the document.
+            quality (Literal["low", "high"]): Processing quality of the document. Deprecated, use model instead.
             chunk (bool): Whether the document should be chunked.
             wait (int): Time to wait for document completion in seconds. Default is 30.
                 If set to -1, waits until completion. If the wait time is exceeded,
@@ -460,6 +488,8 @@ class AsyncAurelioClient:
             polling_interval (int): Time between polling requests in seconds.
                 Default is 15s, if polling_interval is 0, polling is disabled.
             retries (int): Number of times to retry the request in case of failures.
+            model (Optional[Literal["aurelio-base", "docling-base", "gemini-2-flash-lite"]]):
+                Processing model to use. If not provided, it will be inferred from quality.
 
         Returns:
             ExtractResponse: An object containing the response from the API, including
@@ -470,6 +500,22 @@ class AsyncAurelioClient:
             APIError: If there's an error in the API response.
         """
         client_url = f"{self.base_url}/v1/extract/url"
+
+        # Map quality to model if model is not provided
+        if model is None:
+            # Check if URL points to a video based on extension
+            lower_url = url.lower()
+            is_video_url = (
+                any(lower_url.endswith(ext) for ext in [".mp4"]) or "video" in lower_url
+            )
+
+            # For video URLs, always use aurelio-base regardless of quality
+            if is_video_url:
+                model = "aurelio-base"
+            elif quality == "high":
+                model = "docling-base"
+            else:  # quality == "low"
+                model = "aurelio-base"
 
         if wait <= 0:
             session_timeout = None
@@ -483,7 +529,7 @@ class AsyncAurelioClient:
             for attempt in range(1, retries + 1):
                 data = aiohttp.FormData()
                 data.add_field("url", url)
-                data.add_field("quality", quality)
+                data.add_field("model", model)
                 data.add_field("chunk", str(chunk))
 
                 # If polling is enabled (polling_interval > 0), use a short wait time
