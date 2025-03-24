@@ -1,6 +1,6 @@
 from .client import AurelioClient
 from .client_async import AsyncAurelioClient
-from .schema import ChunkingOptions, ChunkResponse, EmbeddingResponse, ExtractResponse
+from .schema import ChunkingOptions, ChunkResponse, EmbeddingResponse, ExtractResponse, VlmModel
 
 __all__ = [
     "AurelioClient",
@@ -9,4 +9,5 @@ __all__ = [
     "ChunkResponse",
     "ExtractResponse",
     "EmbeddingResponse",
+    "VlmModel",
 ]
