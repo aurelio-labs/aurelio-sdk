@@ -49,7 +49,7 @@ All file extraction methods accept these core parameters:
 > **Note:** The `quality` parameter has been deprecated and replaced with the `model` parameter. 
 > - For PDF: `quality="low"` is equivalent to `model="aurelio-base"` (fastest, cheapest, best for clean PDFs)
 > - For PDF: `quality="high"` is equivalent to `model="docling-base"` (code-based OCR for high precision)
-> - For PDF: A new option `model="gemini-2-flash-lite"` uses a Vision Language Model for state-of-the-art text extraction. Note that VLMs can offer superior PDF-to-text performance but come with the risk of hallucinating PDF content <sup>[Y. Liu, et al.](https://arxiv.org/html/2305.07895v5)</sup>
+> - For PDF: A new option `model="gemini-2-flash-lite"` uses a **V**ision **L**anguage **M**odel (VLM) for state-of-the-art text extraction. Note that VLMs can offer superior PDF-to-text performance but come with the risk of hallucinating PDF content <sup>[Y. Liu, et al.](https://arxiv.org/html/2305.07895v5)</sup>
 > - For MP4: Both quality settings used `"aurelio-base"` but with different chunking methods, now specified in `processing_options`
 > - MP4 files can only be processed with `model="aurelio-base"`
 
