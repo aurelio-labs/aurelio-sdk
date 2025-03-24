@@ -43,9 +43,9 @@ from aurelio_sdk import ExtractResponse
 # Local PDF file
 response = client.extract_file(
     file_path="document.pdf", 
-    quality="high",  # Higher quality, more accurate but slower
-    chunk=True,      # Automatically chunk the document
-    wait=30          # Wait up to 30 seconds for processing
+    model="docling-base",  # Higher accuracy model (replaces quality="high")
+    chunk=True,            # Automatically chunk the document
+    wait=30                # Wait up to 30 seconds for processing
 )
 
 # Access the document ID for status checking
@@ -65,9 +65,25 @@ For PDF URLs:
 ```python
 url_response = client.extract_url(
     url="https://arxiv.org/pdf/2305.10403.pdf",
-    quality="high",
+    model="docling-base",  # More accurate model for complex PDFs
     chunk=True,
     wait=30
+)
+```
+
+For video files (only supports aurelio-base model):
+
+```python
+video_response = client.extract_file(
+    file_path="video.mp4",
+    model="aurelio-base",  # Only supported model for video
+    chunk=True,
+    wait=-1,
+    processing_options={
+        "chunking": {
+            "chunker_type": "semantic"  # Better chunking for video content
+        }
+    }
 )
 ```
 
@@ -134,7 +150,7 @@ Extract, chunk, and embed a PDF in one workflow:
 # 1. Extract and chunk a PDF
 extract_response = client.extract_file(
     file_path="research_paper.pdf", 
-    quality="high",
+    model="docling-base",
     chunk=True,
     wait=60
 )

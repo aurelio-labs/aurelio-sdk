@@ -39,11 +39,19 @@ All file extraction methods accept these core parameters:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `quality` | `"low"` \| `"high"` | `"low"` | Processing quality. Higher quality is more accurate but slower and consumes more resources. |
+| `model` | `"aurelio-base"` \| `"docling-base"` \| `"gemini-2-flash-lite"` | `"aurelio-base"` | Model to use for processing. Different models have different capabilities and price points. |
 | `chunk` | `bool` | `True` | Whether to chunk the document using default chunking config. |
 | `wait` | `int` | `30` | Time in seconds to wait for processing completion. Set to `-1` to wait indefinitely. Set to `0` to return immediately with a document ID. |
 | `polling_interval` | `int` | `5` | Time in seconds between status check requests. Set to `0` to disable polling. |
 | `retries` | `int` | `3` | Number of retry attempts in case of API errors (5xx). |
+| `processing_options` | `dict` | `None` | Additional processing options for customizing extraction and chunking behavior. |
+
+> **Note:** The `quality` parameter has been deprecated and replaced with the `model` parameter. 
+> - For PDF: `quality="low"` is equivalent to `model="aurelio-base"` (fastest, cheapest, best for clean PDFs)
+> - For PDF: `quality="high"` is equivalent to `model="docling-base"` (code-based OCR for high precision)
+> - For PDF: A new option `model="gemini-2-flash-lite"` uses a **V**ision **L**anguage **M**odel (VLM) for state-of-the-art text extraction. Note that VLMs can offer superior PDF-to-text performance but come with the risk of hallucinating PDF content <sup>[Y. Liu, et al.](https://arxiv.org/html/2305.07895v5)</sup>
+> - For MP4: Both quality settings used `"aurelio-base"` but with different chunking methods, now specified in `processing_options`
+> - MP4 files can only be processed with `model="aurelio-base"`
 
 ## Processing from PDF Files
 
@@ -56,11 +64,12 @@ def extract_file(
     self,
     file: Optional[Union[IO[bytes], bytes]] = None,
     file_path: Optional[Union[str, pathlib.Path]] = None,
-    quality: Literal["low", "high"] = "low",
+    model: Literal["aurelio-base", "docling-base", "gemini-2-flash-lite"] = "aurelio-base",
     chunk: bool = True,
     wait: int = 30,
     polling_interval: int = 5,
     retries: int = 3,
+    processing_options: Optional[Dict[str, Any]] = None,
 ) -> ExtractResponse:
     """Process a document from a file synchronously."""
 ```
@@ -75,7 +84,7 @@ from aurelio_sdk import AurelioClient
 client = AurelioClient()
 response = client.extract_file(
     file_path="path/to/document.pdf",
-    quality="low",
+    model="aurelio-base",  # Fastest and cheapest option, best for clean PDF files
     chunk=True,
     wait=30
 )
@@ -92,7 +101,7 @@ file_bytes_io.name = "document.pdf"  # Name is important for content type detect
 
 response = client.extract_file(
     file=file_bytes_io,
-    quality="high",
+    model="docling-base",  # Better for complex documents requiring high precision
     chunk=True,
     wait=-1  # Wait until completion
 )
@@ -100,8 +109,9 @@ response = client.extract_file(
 
 ### PDF Processing Recommendations
 
-- Use `quality="low"` for faster processing of simple documents
-- Use `quality="high"` for complex documents with tables, diagrams, or mixed layouts
+- Use `model="aurelio-base"` for faster processing of simple documents (equivalent to old `quality="low"`)
+- Use `model="docling-base"` for complex documents with tables, diagrams, or mixed layouts (equivalent to old `quality="high"`)
+- Use `model="gemini-2-flash-lite"` for state-of-the-art text extraction using a Vision Language Model
 - For large PDFs (>100 pages) or image-heavy PDFs, consider increasing `wait` time or using `-1`
 - The SDK automatically handles pagination and merges content across pages
 
@@ -114,16 +124,22 @@ The SDK can extract transcriptions from video files (MP4 format).
 ```python
 response = client.extract_file(
     file_path="path/to/video.mp4",
-    quality="high",  # Recommended for accurate transcription
+    model="aurelio-base",  # Only model supported for video processing
     chunk=True,
     wait=-1,         # Video processing can take longer
-    polling_interval=15
+    polling_interval=15,
+    processing_options={
+        "chunking": {
+            "chunker_type": "semantic"  # Use semantic chunking (previously achieved with quality="high")
+        }
+    }
 )
 ```
 
 ### Video Processing Recommendations
 
-- Always use `quality="high"` for better transcription accuracy
+- Only `model="aurelio-base"` is supported for video transcription
+- Specify chunking preferences in `processing_options` (use "chunker_type": "semantic" for better chunking, equivalent to old `quality="high"`)
 - Set `wait=-1` for videos longer than 5 minutes
 - Use a longer `polling_interval` (15-30 seconds) for videos to reduce API calls
 - Video processing is more resource-intensive and may take several minutes for longer files
@@ -138,11 +154,12 @@ Extract content from web-based URLs, including PDF documents and webpages.
 def extract_url(
     self,
     url: str,
-    quality: Literal["low", "high"],
+    model: Literal["aurelio-base", "docling-base", "gemini-2-flash-lite"],
     chunk: bool,
     wait: int = 30,
     polling_interval: int = 5,
     retries: int = 3,
+    processing_options: Optional[Dict[str, Any]] = None,
 ) -> ExtractResponse:
     """Process a document from a URL synchronously."""
 ```
@@ -153,7 +170,7 @@ def extract_url(
 # PDF URL
 pdf_response = client.extract_url(
     url="https://example.com/document.pdf",
-    quality="low",
+    model="aurelio-base",
     chunk=True,
     wait=30
 )
@@ -161,16 +178,30 @@ pdf_response = client.extract_url(
 # Web page URL
 webpage_response = client.extract_url(
     url="https://example.com/blog/article",
-    quality="high",
+    model="docling-base",
     chunk=True,
     wait=30
+)
+
+# Video URL (only supports aurelio-base)
+video_response = client.extract_url(
+    url="https://example.com/video.mp4",
+    model="aurelio-base",
+    chunk=True,
+    wait=60,
+    processing_options={
+        "chunking": {
+            "chunker_type": "semantic"
+        }
+    }
 )
 ```
 
 ### URL Processing Recommendations
 
-- For PDF URLs, follow the same recommendations as for PDF files
-- For web pages, use `quality="high"` to better preserve page structure
+- For PDF URLs, follow the same model recommendations as for PDF files
+- For web pages, use `model="docling-base"` to better preserve page structure
+- For video URLs, only `model="aurelio-base"` is supported
 - When extracting from dynamic websites, be aware that client-side rendered content may not be fully captured
 
 ## Waiting Strategies for Large Files
@@ -233,7 +264,7 @@ client = AurelioClient()
 # First request returns immediately with document ID
 response = client.extract_file(
     file_path="large_document.pdf",
-    quality="high",
+    model="docling-base",
     chunk=True,
     wait=0
 )
@@ -310,7 +341,7 @@ client = AurelioClient()
 try:
     response = client.extract_file(
         file_path="document.pdf",
-        quality="high",
+        model="docling-base",
         chunk=True,
         wait=30
     )
